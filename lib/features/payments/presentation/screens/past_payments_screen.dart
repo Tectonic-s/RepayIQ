@@ -17,20 +17,20 @@ class PastPaymentsScreen extends ConsumerStatefulWidget {
 }
 
 class _PastPaymentsScreenState extends ConsumerState<PastPaymentsScreen> {
+  late final List<DateTime> _months;
   late List<bool> _paid;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _paid = List.filled(_months.length, true); // default all paid
-  }
-
-  List<DateTime> get _months {
     final start = widget.loan.startDate;
     final elapsed = widget.loan.monthsElapsed;
-    return List.generate(elapsed, (i) =>
-        DateTime(start.year, start.month + i + 1, widget.loan.dueDay));
+    _months = List.generate(
+      elapsed,
+      (i) => DateTime(start.year, start.month + i + 1, widget.loan.dueDay),
+    );
+    _paid = List.filled(_months.length, true);
   }
 
   int get _paidCount => _paid.where((p) => p).length;

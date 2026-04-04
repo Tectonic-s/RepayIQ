@@ -17,7 +17,7 @@ class LoanRepositoryImpl implements LoanRepository {
     _init();
   }
 
-  bool _suppressNextRemoteEmit = false;
+  int _pendingRemoteWrites = 0;
 
   void _init() {
     if (_remote.watchLoans() == const Stream<List<Loan>>.empty()) return;
@@ -26,9 +26,9 @@ class LoanRepositoryImpl implements LoanRepository {
 
     _remote.watchLoans().listen((loans) async {
       await _local.upsertAll(loans);
-      if (_suppressNextRemoteEmit) {
-        _suppressNextRemoteEmit = false;
-        return; // skip — _pushLocal already emitted this write
+      if (_pendingRemoteWrites > 0) {
+        _pendingRemoteWrites--;
+        return;
       }
       _emit(loans);
     }, onError: (_) {});
@@ -62,7 +62,10 @@ class LoanRepositoryImpl implements LoanRepository {
   @override
   Future<Loan> getLoan(String id) async {
     final loan = await _local.getLoan(id);
-    return loan!;
+    if (loan != null) return loan;
+    // Fallback to remote if not in local cache
+    final loans = await _remote.getLoans();
+    return loans.firstWhere((l) => l.id == id);
   }
 
   @override
@@ -70,7 +73,7 @@ class LoanRepositoryImpl implements LoanRepository {
     await _local.upsertLoan(loan);
     await _pushLocal();
     if (await _network.isConnected) {
-      _suppressNextRemoteEmit = true;
+      _pendingRemoteWrites++;
       await _remote.setLoan(loan);
     }
   }
@@ -80,7 +83,7 @@ class LoanRepositoryImpl implements LoanRepository {
     await _local.upsertLoan(loan);
     await _pushLocal();
     if (await _network.isConnected) {
-      _suppressNextRemoteEmit = true;
+      _pendingRemoteWrites++;
       await _remote.setLoan(loan);
     }
   }
@@ -90,7 +93,7 @@ class LoanRepositoryImpl implements LoanRepository {
     await _local.deleteLoan(id);
     await _pushLocal();
     if (await _network.isConnected) {
-      _suppressNextRemoteEmit = true;
+      _pendingRemoteWrites++;
       await _remote.deleteLoan(id);
     }
   }
