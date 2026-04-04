@@ -28,12 +28,12 @@ class ScoreCalculator {
     final active = loans.where((l) => l.status == 'Active').toList();
 
     // Factor 1 — Payment history (40%)
-    // Overdue loans reduce score. 0 overdue = full marks.
+    // Overdue loans reduce score. Uses date-based check (payment data not available here).
     final overdueCount = active.where((l) => l.isOverdue).length;
     final paymentRaw = active.isEmpty
         ? 1.0
         : (active.length - overdueCount) / active.length;
-    final paymentScore = paymentRaw * 40;
+    final paymentScore = (paymentRaw * 40).clamp(0.0, 40.0);
 
     // Factor 2 — Debt-to-income ratio (30%)
     // Total EMI / monthly income. Below 30% = full marks, above 60% = 0.

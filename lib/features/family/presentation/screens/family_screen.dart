@@ -53,7 +53,7 @@ class FamilyScreen extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => _AddMemberSheet(ref: ref),
+      builder: (ctx) => const _AddMemberSheet(),
     );
   }
 
@@ -243,14 +243,13 @@ class _DRow extends StatelessWidget {
 
 // ── Add member sheet ──────────────────────────────────────────────────────────
 
-class _AddMemberSheet extends StatefulWidget {
-  final WidgetRef ref;
-  const _AddMemberSheet({required this.ref});
+class _AddMemberSheet extends ConsumerStatefulWidget {
+  const _AddMemberSheet();
   @override
-  State<_AddMemberSheet> createState() => _AddMemberSheetState();
+  ConsumerState<_AddMemberSheet> createState() => _AddMemberSheetState();
 }
 
-class _AddMemberSheetState extends State<_AddMemberSheet> {
+class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _incomeCtrl = TextEditingController();
@@ -265,7 +264,7 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
-    await widget.ref.read(familyNotifierProvider.notifier).addMember(
+    await ref.read(familyNotifierProvider.notifier).addMember(
       name: _nameCtrl.text.trim(),
       relationship: _relationship,
       monthlyIncome: double.tryParse(_incomeCtrl.text) ?? 0,
