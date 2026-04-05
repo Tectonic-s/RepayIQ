@@ -33,6 +33,13 @@ class Formatters {
   static String percentage(double value) =>
       '${value.toStringAsFixed(1)}%';
 
+  /// PDF-safe currency — uses Rs. instead of ₹ (default PDF font lacks rupee symbol)
+  /// and shows full expanded number with 2 decimal places
+  static String pdfCurrency(double amount) {
+    final formatted = NumberFormat('#,##,##0.00', 'en_IN').format(amount);
+    return 'Rs. $formatted';
+  }
+
   /// Compact currency for tables — e.g. ₹1.2L, ₹45K
   static String compactCurrency(double amount) {
     if (amount >= 10000000) return '₹${(amount / 10000000).toStringAsFixed(1)}Cr';
