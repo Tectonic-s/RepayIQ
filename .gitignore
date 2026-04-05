@@ -49,6 +49,9 @@ google-services.json
 GoogleService-Info.plist
 lib/firebase_options.dart
 
+# Xcode schemes (may contain dart-define secrets)
+ios/Runner.xcodeproj/xcshareddata/xcschemes/
+
 # Environment / secrets
 .env
 .vscode/launch.json

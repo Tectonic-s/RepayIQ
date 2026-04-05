@@ -6,10 +6,7 @@ import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 class StatementImportService {
   // Key loaded from dart-define at build time, falls back to hardcoded for direct Xcode builds
-  static const _apiKey = String.fromEnvironment(
-    'GEMINI_API_KEY',
-    defaultValue: 'AIzaSyDlnohujwH94ZLRA4x_ya8nTboylPkS4uo',
-  );
+  static const _apiKey = String.fromEnvironment('GEMINI_API_KEY');
 
   /// Picks a PDF, extracts text, sends to Gemini, returns validated field map.
   /// Returns null if user cancelled or extraction failed.

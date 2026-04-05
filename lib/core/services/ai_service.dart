@@ -4,10 +4,7 @@ import '../../features/loans/domain/entities/loan.dart';
 import 'gemini_prompt_builder.dart';
 
 class AiService {
-  static const _apiKey = String.fromEnvironment(
-    'GEMINI_API_KEY',
-    defaultValue: 'AIzaSyDlnohujwH94ZLRA4x_ya8nTboylPkS4uo',
-  );
+  static const _apiKey = String.fromEnvironment('GEMINI_API_KEY');
 
   static GenerativeModel get _model {
     if (_apiKey.isEmpty) throw StateError('Gemini API key not configured.');
