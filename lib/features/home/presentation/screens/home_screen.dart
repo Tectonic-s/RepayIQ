@@ -102,7 +102,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 ],
 
-                const SizedBox(height: 120),
+                const SizedBox(height: 100),
               ]),
             ),
           ),
