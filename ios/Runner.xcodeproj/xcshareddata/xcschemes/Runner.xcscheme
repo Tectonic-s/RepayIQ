@@ -76,7 +76,7 @@
       <EnvironmentVariables>
          <EnvironmentVariable
             key = "DART_DEFINES"
-            value = "GEMINI_API_KEY=AIzaSyB1eKM4r8M3EhedDrD4GGowI8H3dkQlzEw"
+            value = "GEMINI_API_KEY=AIzaSyCnRO3DTK-fF8Q-8x1HrltTlYootj4lqis"
             isEnabled = "YES">
          </EnvironmentVariable>
       </EnvironmentVariables>
