@@ -1,20 +1,16 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'ocr_service.dart';
 
+/// Imports loan details from a PDF or image entirely on-device.
+/// No data is sent to any server or AI service.
+/// Text extraction: syncfusion (PDF) or ML Kit (images).
+/// Field parsing: regex — fully offline.
 class StatementImportService {
-  // Key loaded from dart-define at build time, falls back to hardcoded for direct Xcode builds
-  static const _apiKey = String.fromEnvironment('GEMINI_API_KEY');
 
-  /// Picks a PDF, extracts text, sends to Gemini, returns validated field map.
-  /// Returns null if user cancelled or extraction failed.
-  /// Throws [StatementImportException] with a user-facing message on failure.
   static Future<Map<String, dynamic>?> importFromPdf() async {
-    // 1. Pick PDF or image file
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
@@ -26,26 +22,35 @@ class StatementImportService {
     final bytes = file.bytes!;
     final ext = file.extension?.toLowerCase() ?? '';
 
-    // 2. Extract text
+    // ── Step 1: Extract text on-device ──────────────────────────────────────
     String text;
     if (ext == 'pdf') {
-      text = _extractText(bytes);
+      text = _extractPdfText(bytes);
       if (text.trim().isEmpty) {
         throw StatementImportException(
-          'This PDF appears to be scanned (image-based). '
-          'Please try uploading a JPG or PNG screenshot of the statement instead.',
+          'This PDF appears to be scanned. '
+          'Please upload a JPG or PNG photo of the statement instead.',
         );
       }
     } else {
-      // For images, send directly to Gemini as multimodal input
-      return await _callGeminiWithImage(bytes, ext);
+      // Image — use ML Kit OCR (on-device, zero network)
+      final dir = await getTemporaryDirectory();
+      final tmpFile = File('${dir.path}/ocr_import.$ext');
+      await tmpFile.writeAsBytes(bytes);
+      try {
+        text = await OcrService.extractText(tmpFile);
+      } on OcrException catch (e) {
+        throw StatementImportException(e.message);
+      } finally {
+        await tmpFile.delete();
+      }
     }
 
-    // 3. Send to Gemini
-    final extracted = await _callGemini(text);
+    // ── Step 2: Parse fields with regex — fully offline ──────────────────────
+    final extracted = _parseFields(text);
 
-    // 4. Validate — relax validation, return partial data if at least principal exists
-    final principal = (extracted['principal'] as num?)?.toDouble();
+    // ── Step 3: Validate — need at least principal ───────────────────────────
+    final principal = extracted['principal'] as double?;
     if (principal == null || principal <= 0) {
       throw StatementImportException(
         'Could not find the loan amount in this document. '
@@ -56,10 +61,12 @@ class StatementImportService {
     return extracted;
   }
 
-  static String _extractText(List<int> bytes) {
+  // ── PDF text extraction ────────────────────────────────────────────────────
+
+  static String _extractPdfText(List<int> bytes) {
     final doc = PdfDocument(inputBytes: bytes);
     final buffer = StringBuffer();
-    final pageCount = doc.pages.count.clamp(0, 5); // up to 5 pages
+    final pageCount = doc.pages.count.clamp(0, 5);
     final extractor = PdfTextExtractor(doc);
     for (int i = 0; i < pageCount; i++) {
       buffer.writeln(extractor.extractText(startPageIndex: i, endPageIndex: i));
@@ -68,97 +75,121 @@ class StatementImportService {
     return buffer.toString();
   }
 
-  /// For images: extract text on-device with ML Kit, then parse with Gemini.
-  /// The image never leaves the device — only the extracted text is sent to Gemini.
-  static Future<Map<String, dynamic>> _callGeminiWithImage(
-      List<int> bytes, String ext) async {
-    final dir = await getTemporaryDirectory();
-    final tmpFile = File('${dir.path}/ocr_import.$ext');
-    await tmpFile.writeAsBytes(bytes);
-    try {
-      final text = await OcrService.extractText(tmpFile);
-      return await _callGemini(text);
-    } on OcrException catch (e) {
-      throw StatementImportException(e.message);
-    } finally {
-      await tmpFile.delete();
-    }
+  // ── On-device regex field parser ───────────────────────────────────────────
+
+  static Map<String, dynamic> _parseFields(String text) {
+    return {
+      'principal': _extractAmount(text, [
+        r'(?:sanctioned|disbursed|loan)\s*amount[:\s₹Rs.]*([0-9,. ]+)',
+        r'principal[:\s₹Rs.]*([0-9,. ]+)',
+        r'loan\s*amount[:\s₹Rs.]*([0-9,. ]+)',
+      ]),
+      'interestRate': _extractRate(text),
+      'tenureMonths': _extractTenure(text),
+      'monthlyEmi': _extractAmount(text, [
+        r'(?:monthly\s*)?emi[:\s₹Rs.]*([0-9,. ]+)',
+        r'equated\s*monthly\s*instalment[:\s₹Rs.]*([0-9,. ]+)',
+        r'monthly\s*instalment[:\s₹Rs.]*([0-9,. ]+)',
+      ]),
+      'startDate': _extractDate(text),
+      'lenderName': _extractLender(text),
+      'loanName': _extractLoanType(text),
+    };
   }
 
-  static Future<Map<String, dynamic>> _callGemini(String text) async {
-    if (_apiKey.isEmpty) {
-      throw StatementImportException(
-        'AI extraction is not configured. Please contact support.',
-      );
+  static double? _extractAmount(String text, List<String> patterns) {
+    for (final pattern in patterns) {
+      final match = RegExp(pattern, caseSensitive: false).firstMatch(text);
+      if (match != null) {
+        final raw = match.group(1)?.replaceAll(RegExp(r'[, ]'), '') ?? '';
+        final value = double.tryParse(raw);
+        if (value != null && value > 0) return value;
+      }
     }
-    final model = GenerativeModel(
-      model: 'gemini-2.5-flash',
-      apiKey: _apiKey,
-    );
-
-    // Sanitise and truncate
-    final sanitised = text
-        .replaceAll(RegExp(r'ignore.{0,30}instruction', caseSensitive: false), '')
-        .substring(0, text.length.clamp(0, 8000));
-
-    final prompt = '''
-You are a financial data extraction assistant specialising in Indian bank loan documents.
-Extract loan details from the text below. The document may be a loan statement, sanction letter, loan agreement, or repayment schedule from any Indian bank or NBFC.
-
-Common Indian bank field names to look for:
-- Principal / Loan Amount / Sanctioned Amount / Disbursed Amount
-- Rate of Interest / ROI / Interest Rate / p.a.
-- Tenure / Loan Period / Repayment Period (in months or years)
-- EMI / Monthly Instalment / Equated Monthly Instalment
-- Disbursement Date / Loan Date / Start Date / Commencement Date
-- Bank / Lender / Branch
-
-Return ONLY a valid JSON object:
-{
-  "loanName": "loan type e.g. Home Loan, Personal Loan, Car Loan",
-  "lenderName": "bank or NBFC name",
-  "principal": <number in rupees, digits only>,
-  "interestRate": <annual rate as number e.g. 8.5>,
-  "tenureMonths": <total months as integer>,
-  "monthlyEmi": <EMI amount in rupees as number>,
-  "startDate": "YYYY-MM-DD"
-}
-
-Rules:
-- Return ONLY the JSON. No explanation, no markdown, no code fences.
-- Use null for any field you cannot find with confidence.
-- Strip all currency symbols (₹, Rs, INR) and commas from numbers.
-- Convert years to months for tenureMonths.
-- If you see amounts like "5,00,000" that is 500000 in Indian numbering.
-
----
-Document text:
-$sanitised
-''';
-
-    final response = await model.generateContent([
-      Content.text(prompt),
-    ]);
-
-    final raw = response.text ?? '';
-    final cleaned = raw
-        .replaceAll('```json', '')
-        .replaceAll('```', '')
-        .trim();
-
-    // Extract JSON even if there's surrounding text
-    final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(cleaned);
-    final jsonStr = jsonMatch?.group(0) ?? cleaned;
-
-    try {
-      return jsonDecode(jsonStr) as Map<String, dynamic>;
-    } catch (_) {
-      throw StatementImportException(
-        'Could not parse the extracted data. Please try again or fill in manually.',
-      );
-    }
+    return null;
   }
 
+  static double? _extractRate(String text) {
+    final patterns = [
+      r'(?:rate\s*of\s*interest|roi|interest\s*rate)[:\s]*([0-9.]+)\s*%',
+      r'([0-9.]+)\s*%\s*(?:p\.?a\.?|per\s*annum)',
+    ];
+    for (final pattern in patterns) {
+      final match = RegExp(pattern, caseSensitive: false).firstMatch(text);
+      if (match != null) {
+        final value = double.tryParse(match.group(1) ?? '');
+        if (value != null && value > 0 && value <= 50) return value;
+      }
+    }
+    return null;
+  }
+
+  static int? _extractTenure(String text) {
+    // Try months first
+    final monthMatch = RegExp(
+      r'(?:tenure|loan\s*period|repayment\s*period)[:\s]*([0-9]+)\s*(?:months?|mos?)',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (monthMatch != null) {
+      final v = int.tryParse(monthMatch.group(1) ?? '');
+      if (v != null && v > 0 && v <= 360) return v;
+    }
+    // Try years and convert
+    final yearMatch = RegExp(
+      r'(?:tenure|loan\s*period|repayment\s*period)[:\s]*([0-9]+)\s*(?:years?|yrs?)',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (yearMatch != null) {
+      final v = int.tryParse(yearMatch.group(1) ?? '');
+      if (v != null && v > 0 && v <= 30) return v * 12;
+    }
+    return null;
+  }
+
+  static String? _extractDate(String text) {
+    // DD/MM/YYYY or DD-MM-YYYY
+    final match = RegExp(
+      r'(?:disbursement|start|commencement|loan)\s*date[:\s]*(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (match != null) {
+      final d = match.group(1)!.padLeft(2, '0');
+      final m = match.group(2)!.padLeft(2, '0');
+      final y = match.group(3)!;
+      return '$y-$m-$d';
+    }
+    return null;
+  }
+
+  static String? _extractLender(String text) {
+    final banks = [
+      'SBI', 'HDFC', 'ICICI', 'Axis', 'Kotak', 'PNB', 'Bank of Baroda',
+      'Canara', 'Union Bank', 'IndusInd', 'Yes Bank', 'IDFC', 'Bajaj',
+      'Tata Capital', 'Muthoot', 'Manappuram', 'LIC Housing',
+    ];
+    for (final bank in banks) {
+      if (text.toLowerCase().contains(bank.toLowerCase())) return bank;
+    }
+    return null;
+  }
+
+  static String? _extractLoanType(String text) {
+    final types = {
+      'Home Loan': ['home loan', 'housing loan', 'mortgage'],
+      'Vehicle Loan': ['vehicle loan', 'car loan', 'auto loan', 'two wheeler'],
+      'Personal Loan': ['personal loan'],
+      'Education Loan': ['education loan', 'student loan'],
+      'Business Loan': ['business loan', 'msme', 'working capital'],
+      'Consumer Durable': ['consumer durable', 'emi card', 'no cost emi'],
+    };
+    final lower = text.toLowerCase();
+    for (final entry in types.entries) {
+      for (final keyword in entry.value) {
+        if (lower.contains(keyword)) return entry.key;
+      }
+    }
+    return null;
+  }
 }
 
 class StatementImportException implements Exception {
