@@ -1297,3 +1297,120 @@ if (_pendingNotificationRoutes.isNotEmpty) {
 - `const` in `StreamController` constructors doesn't prevent leaks — always close in `dispose()`
 - `ref.onDispose` is the correct Riverpod cleanup hook for streams, timers, and controllers
 - Prompt injection is a real risk — always sanitise, truncate, and structurally separate user data from AI instructions
+
+---
+
+## 40. ML Kit OCR Integration — Problem Log & Fix
+
+**Files:**
+- `lib/core/services/ocr_service.dart`
+- `lib/core/services/statement_import_service.dart`
+- `ios/Podfile`
+- `pubspec.yaml`
+
+### What ML Kit does
+
+Google ML Kit Text Recognition runs entirely on-device. No image is sent to any server. The `TextRecognizer` processes a local `File` and returns extracted text. Used to scan loan statement images (JPG/PNG) before sending extracted text to Gemini for structured parsing.
+
+---
+
+### Problem 1 — `MLKitVision` unversioned dependency conflict
+
+**Package versions affected:** `google_mlkit_text_recognition ^0.11.0` to `^0.13.1`
+
+**Root cause:** `google_mlkit_commons 0.8.1` declared `MLKitVision` without a version pin:
+```ruby
+s.dependency 'MLKitVision'  # no version — CocoaPods can't resolve
+```
+Meanwhile `google_mlkit_text_recognition` required:
+```ruby
+s.dependency 'MLKitVision', '~> 7.0'
+```
+CocoaPods treats an unversioned and a versioned spec for the same pod as incompatible:
+```
+CocoaPods could not find compatible versions for pod "MLKitVision"
+```
+
+**Fix:** Upgraded to `google_mlkit_text_recognition: ^0.15.1` which pulls `google_mlkit_commons 0.11.1`. This version finally has a versioned dependency:
+```ruby
+s.dependency 'MLKitVision', '~> 10.0.0'  # versioned — resolves correctly
+```
+
+---
+
+### Problem 2 — Minimum deployment target too low
+
+**Root cause:** `google_mlkit_commons 0.11.1` requires iOS 15.5:
+```ruby
+s.ios.deployment_target = '15.5'
+```
+Podfile was set to `platform :ios, '14.0'`, causing:
+```
+Specs satisfying the dependency were found, but they required a higher minimum deployment target.
+```
+
+**Fix:** Updated `ios/Podfile`:
+```ruby
+platform :ios, '15.5'
+
+# and in post_install:
+config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5'
+```
+
+---
+
+### Problem 3 — Image was being sent to Gemini (privacy violation)
+
+**Root cause:** The original `_callGeminiWithImage` sent raw image bytes to Gemini as multimodal input — violating the privacy architecture which states images never leave the device.
+
+**Fix:** ML Kit extracts text on-device first, then only the text goes to Gemini:
+```dart
+final tmpFile = File('${dir.path}/ocr_import.$ext');
+await tmpFile.writeAsBytes(bytes);
+try {
+  final text = await OcrService.extractText(tmpFile); // on-device, zero network
+  return await _callGemini(text);                     // only text sent to Gemini
+} finally {
+  await tmpFile.delete();                             // clean up immediately
+}
+```
+
+---
+
+### OcrService rules
+
+```dart
+// Always create a fresh recognizer per call — never reuse
+final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
+try {
+  final result = await recognizer.processImage(inputImage);
+} finally {
+  await recognizer.close(); // ALWAYS close — prevents memory leaks
+}
+```
+
+- Never reuse a `TextRecognizer` instance across calls
+- Always call `recognizer.close()` in a `finally` block
+- Use `TextRecognitionScript.latin` for English/Indian bank documents
+- Handle empty `result.text` explicitly — low-quality images return empty strings
+- Write bytes to temp file, process, then delete — don't hold images in memory
+
+---
+
+### Final data flow (privacy-compliant)
+
+```
+User picks JPG/PNG
+        ↓
+Bytes written to temp file (device only)
+        ↓
+ML Kit OCR — on-device, zero network calls
+        ↓
+Raw text extracted, temp file deleted
+        ↓
+Text sanitised + truncated to 8000 chars
+        ↓
+Gemini API — only text, no image
+        ↓
+Structured JSON → validated → pre-fills Add Loan form
+```

@@ -1,8 +1,10 @@
 import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
+import 'ocr_service.dart';
 
 class StatementImportService {
   // Key loaded from dart-define at build time, falls back to hardcoded for direct Xcode builds
@@ -66,51 +68,20 @@ class StatementImportService {
     return buffer.toString();
   }
 
-  /// For images: send directly to Gemini as multimodal input
+  /// For images: extract text on-device with ML Kit, then parse with Gemini.
+  /// The image never leaves the device — only the extracted text is sent to Gemini.
   static Future<Map<String, dynamic>> _callGeminiWithImage(
       List<int> bytes, String ext) async {
-    if (_apiKey.isEmpty) {
-      throw StatementImportException(
-        'AI extraction is not configured. Please contact support.',
-      );
-    }
-    final model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: _apiKey);
-    final mimeType = ext == 'png' ? 'image/png' : 'image/jpeg';
-
-    const prompt = 'You are a financial data extraction assistant for Indian bank documents. '
-        'Extract loan details from this image. It may be a loan statement, sanction letter, or agreement. '
-        'Return ONLY a valid JSON object with fields: '
-        'loanName (string), lenderName (string), principal (number in rupees), interestRate (annual % as number), '
-        'tenureMonths (integer), monthlyEmi (number in rupees), startDate (YYYY-MM-DD string). '
-        'Strip all currency symbols and commas from numbers. Convert Indian lakh/crore notation. '
-        'Use null for any field not clearly visible. No markdown, no explanation, JSON only.';
-
-    final response = await model.generateContent([
-      Content.multi([
-        TextPart(prompt),
-        DataPart(mimeType, Uint8List.fromList(bytes)),
-      ]),
-    ]);
-
-    final raw = response.text ?? '';
-    final cleaned = raw.replaceAll('```json', '').replaceAll('```', '').trim();
-    final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(cleaned);
-    final jsonStr = jsonMatch?.group(0) ?? cleaned;
+    final dir = await getTemporaryDirectory();
+    final tmpFile = File('${dir.path}/ocr_import.$ext');
+    await tmpFile.writeAsBytes(bytes);
     try {
-      final data = jsonDecode(jsonStr) as Map<String, dynamic>;
-      final principal = (data['principal'] as num?)?.toDouble();
-      if (principal == null || principal <= 0) {
-        throw StatementImportException(
-          'Could not find the loan amount in this image. '
-          'Please fill in the form manually.',
-        );
-      }
-      return data;
-    } catch (e) {
-      if (e is StatementImportException) rethrow;
-      throw StatementImportException(
-        'Could not read the image. Please try a clearer photo or a PDF.',
-      );
+      final text = await OcrService.extractText(tmpFile);
+      return await _callGemini(text);
+    } on OcrException catch (e) {
+      throw StatementImportException(e.message);
+    } finally {
+      await tmpFile.delete();
     }
   }
 
