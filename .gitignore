@@ -56,7 +56,3 @@ ios/Runner.xcodeproj/xcshareddata/xcschemes/
 .env
 .vscode/launch.json
 build_and_install.sh
-
-# AI service files contain API key fallback
-lib/core/services/ai_service.dart
-lib/core/services/statement_import_service.dart
