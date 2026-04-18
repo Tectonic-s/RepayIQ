@@ -66,5 +66,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>RepayIQ needs camera access to scan loan documents.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>RepayIQ needs photo library access to import loan statement images.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>RepayIQ needs access to save documents.</string>
 </dict>
 </plist>

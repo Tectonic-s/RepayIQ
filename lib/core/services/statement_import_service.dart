@@ -49,13 +49,24 @@ class StatementImportService {
     // ── Step 2: Parse fields with regex — fully offline ──────────────────────
     final extracted = _parseFields(text);
 
-    // ── Step 3: Validate — need at least principal ───────────────────────────
-    final principal = extracted['principal'] as double?;
-    if (principal == null || principal <= 0) {
-      throw StatementImportException(
-        'Could not find the loan amount in this document. '
-        'Please fill in the form manually.',
-      );
+    // Print text in small chunks with flutter: prefix
+    // ignore: avoid_print
+    print('TEXTLEN:${text.length}');
+    final lines = text.split('\n');
+    for (int i = 0; i < lines.length; i++) {
+      // ignore: avoid_print
+      print('L$i:${lines[i]}');
+    }
+    // ignore: avoid_print
+    print('=== PARSED FIELDS: $extracted ===');
+
+    // ── Step 3: Return whatever was found — user reviews before saving ────────
+    // Even if nothing matched, return the map so the form opens (all fields empty)
+    // Only throw if text extraction itself produced nothing useful
+    final hasAnyField = extracted.values.any((v) => v != null);
+    if (!hasAnyField) {
+      // Return empty map — caller will show "fill manually" snackbar
+      return {};
     }
 
     return extracted;
@@ -66,10 +77,16 @@ class StatementImportService {
   static String _extractPdfText(List<int> bytes) {
     final doc = PdfDocument(inputBytes: bytes);
     final buffer = StringBuffer();
-    final pageCount = doc.pages.count.clamp(0, 5);
+    final pageCount = doc.pages.count; // extract ALL pages
     final extractor = PdfTextExtractor(doc);
     for (int i = 0; i < pageCount; i++) {
-      buffer.writeln(extractor.extractText(startPageIndex: i, endPageIndex: i));
+      try {
+        final pageText = extractor.extractText(startPageIndex: i, endPageIndex: i);
+        buffer.writeln('--- PAGE ${i + 1} ---');
+        buffer.writeln(pageText);
+      } catch (_) {
+        // skip unreadable pages
+      }
     }
     doc.dispose();
     return buffer.toString();
@@ -80,16 +97,18 @@ class StatementImportService {
   static Map<String, dynamic> _parseFields(String text) {
     return {
       'principal': _extractAmount(text, [
-        r'(?:sanctioned|disbursed|loan)\s*amount[:\s₹Rs.]*([0-9,. ]+)',
-        r'principal[:\s₹Rs.]*([0-9,. ]+)',
-        r'loan\s*amount[:\s₹Rs.]*([0-9,. ]+)',
+        r'(?<!Dropline\s)(?<!Utilized\s)(?<!Available\s)Loan Amount\s*\([^)]*\)\s*([\d,]+\.?\d*)',
+        r'(?:sanctioned|disbursed)\s*(?:loan\s*)?amount\s*[:\(₹Rs.]*\s*([\d,]+\.?\d*)',
+        r'principal\s*(?:amount)?\s*[:\(₹Rs.]*\s*([\d,]+\.?\d*)',
+        r'Dropline Loan Amount\s*\([^)]*\)\s*([\d,]+\.?\d*)',
       ]),
       'interestRate': _extractRate(text),
       'tenureMonths': _extractTenure(text),
       'monthlyEmi': _extractAmount(text, [
-        r'(?:monthly\s*)?emi[:\s₹Rs.]*([0-9,. ]+)',
-        r'equated\s*monthly\s*instalment[:\s₹Rs.]*([0-9,. ]+)',
-        r'monthly\s*instalment[:\s₹Rs.]*([0-9,. ]+)',
+        r'(?:monthly\s*)?emi\s*(?:amount)?\s*[:\(₹Rs.]*\s*([\d,]+\.?\d*)',
+        r'instalment\s*amount\s*[:\(₹Rs.]*\s*([\d,]+\.?\d*)',
+        r'equated\s*monthly\s*instalment\s*[:\(₹Rs.]*\s*([\d,]+\.?\d*)',
+        r'monthly\s*instalment\s*[:\(₹Rs.]*\s*([\d,]+\.?\d*)',
       ]),
       'startDate': _extractDate(text),
       'lenderName': _extractLender(text),
@@ -99,11 +118,12 @@ class StatementImportService {
 
   static double? _extractAmount(String text, List<String> patterns) {
     for (final pattern in patterns) {
-      final match = RegExp(pattern, caseSensitive: false).firstMatch(text);
+      final match = RegExp(pattern, caseSensitive: false, multiLine: true).firstMatch(text);
       if (match != null) {
-        final raw = match.group(1)?.replaceAll(RegExp(r'[, ]'), '') ?? '';
+        // Remove Indian-format commas e.g. 10,40,000.00 → 1040000.00
+        final raw = match.group(1)?.replaceAll(',', '') ?? '';
         final value = double.tryParse(raw);
-        if (value != null && value > 0) return value;
+        if (value != null && value > 1000) return value;
       }
     }
     return null;
@@ -111,11 +131,13 @@ class StatementImportService {
 
   static double? _extractRate(String text) {
     final patterns = [
-      r'(?:rate\s*of\s*interest|roi|interest\s*rate)[:\s]*([0-9.]+)\s*%',
+      r'Current\s*Rat(?:e)?\s*(?:of\s*Interest)?\s*[:\(\s%]*([0-9.]+)',
+      r'(?:rate\s*of\s*interest|roi|interest\s*rate)\s*[:\s%\(]*([0-9.]+)',
       r'([0-9.]+)\s*%\s*(?:p\.?a\.?|per\s*annum)',
+      r'Annual.*?Charge.*?([0-9.]+)\s*%',
     ];
     for (final pattern in patterns) {
-      final match = RegExp(pattern, caseSensitive: false).firstMatch(text);
+      final match = RegExp(pattern, caseSensitive: false, multiLine: true).firstMatch(text);
       if (match != null) {
         final value = double.tryParse(match.group(1) ?? '');
         if (value != null && value > 0 && value <= 50) return value;
@@ -125,23 +147,19 @@ class StatementImportService {
   }
 
   static int? _extractTenure(String text) {
-    // Try months first
-    final monthMatch = RegExp(
-      r'(?:tenure|loan\s*period|repayment\s*period)[:\s]*([0-9]+)\s*(?:months?|mos?)',
-      caseSensitive: false,
-    ).firstMatch(text);
-    if (monthMatch != null) {
-      final v = int.tryParse(monthMatch.group(1) ?? '');
-      if (v != null && v > 0 && v <= 360) return v;
-    }
-    // Try years and convert
-    final yearMatch = RegExp(
-      r'(?:tenure|loan\s*period|repayment\s*period)[:\s]*([0-9]+)\s*(?:years?|yrs?)',
-      caseSensitive: false,
-    ).firstMatch(text);
-    if (yearMatch != null) {
-      final v = int.tryParse(yearMatch.group(1) ?? '');
-      if (v != null && v > 0 && v <= 30) return v * 12;
+    final patterns = [
+      r'(?:tenure|loan\s*period|repayment\s*period|no\.?\s*of\s*(?:emi|instalment)s?)\s*[:\s]*([0-9]+)\s*(?:months?|mos?)',
+      r'(?:tenure|loan\s*period|repayment\s*period)\s*[:\s]*([0-9]+)\s*(?:years?|yrs?)',
+      r'Total\s*(?:No\.?\s*of\s*)?(?:EMI|Instalment)s?\s*[:\s]*([0-9]+)',
+    ];
+    for (int i = 0; i < patterns.length; i++) {
+      final match = RegExp(patterns[i], caseSensitive: false, multiLine: true).firstMatch(text);
+      if (match != null) {
+        final v = int.tryParse(match.group(1) ?? '');
+        if (v != null && v > 0 && v <= 360) {
+          return i == 1 ? v * 12 : v; // convert years to months
+        }
+      }
     }
     return null;
   }
@@ -175,12 +193,12 @@ class StatementImportService {
 
   static String? _extractLoanType(String text) {
     final types = {
-      'Home Loan': ['home loan', 'housing loan', 'mortgage'],
-      'Vehicle Loan': ['vehicle loan', 'car loan', 'auto loan', 'two wheeler'],
-      'Personal Loan': ['personal loan'],
+      'Home Loan': ['home loan', 'housing loan', 'mortgage', 'hl'],
+      'Vehicle Loan': ['vehicle loan', 'car loan', 'auto loan', 'two wheeler', 'tl'],
+      'Personal Loan': ['personal loan', 'sal pl', 'pl', 'flexi'],
       'Education Loan': ['education loan', 'student loan'],
-      'Business Loan': ['business loan', 'msme', 'working capital'],
-      'Consumer Durable': ['consumer durable', 'emi card', 'no cost emi'],
+      'Business Loan': ['business loan', 'msme', 'working capital', 'bl'],
+      'Consumer Durable': ['consumer durable', 'emi card', 'no cost emi', 'cd'],
     };
     final lower = text.toLowerCase();
     for (final entry in types.entries) {
