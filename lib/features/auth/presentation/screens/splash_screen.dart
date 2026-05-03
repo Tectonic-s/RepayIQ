@@ -170,6 +170,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                           width: 116,
                           height: 116,
                           fit: BoxFit.cover,
+<<<<<<< HEAD
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -188,6 +189,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                             height: 116,
                             fit: BoxFit.cover,
                           ),
+=======
+>>>>>>> 46f1bc4 (UX and animation improvements)
                         ),
                       ),
                     ),
