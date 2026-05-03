@@ -56,15 +56,57 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/welcome',
-        pageBuilder: (ctx, st) => _fadePage(st, const WelcomeScreen()),
+        pageBuilder: (ctx, st) => CustomTransitionPage(
+          key: st.pageKey,
+          child: const WelcomeScreen(),
+          transitionDuration: const Duration(milliseconds: 600),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+              child: child,
+            );
+          },
+        ),
       ),
       GoRoute(
         path: '/onboarding',
-        pageBuilder: (ctx, st) => _fadePage(st, const OnboardingFlowScreen()),
+        pageBuilder: (ctx, st) => CustomTransitionPage(
+          key: st.pageKey,
+          child: const OnboardingFlowScreen(),
+          transitionDuration: const Duration(milliseconds: 500),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(1.0, 0.0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic)),
+              child: FadeTransition(
+                opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+                child: child,
+              ),
+            );
+          },
+        ),
       ),
       GoRoute(
         path: '/login',
-        pageBuilder: (ctx, st) => _fadePage(st, const LoginScreen()),
+        pageBuilder: (ctx, st) => CustomTransitionPage(
+          key: st.pageKey,
+          child: const LoginScreen(),
+          transitionDuration: const Duration(milliseconds: 500),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.0, 1.0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic)),
+              child: FadeTransition(
+                opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+                child: child,
+              ),
+            );
+          },
+        ),
       ),
       GoRoute(
         path: '/register',

@@ -41,8 +41,8 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
   void _nextPage() {
     if (_currentPage < 3) {
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOutCubic,
       );
     } else {
       _completeOnboarding();
@@ -51,8 +51,8 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
 
   void _previousPage() {
     _pageController.previousPage(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOutCubic,
     );
   }
 

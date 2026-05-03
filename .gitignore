@@ -56,3 +56,6 @@ ios/Runner.xcodeproj/xcshareddata/xcschemes/
 .env
 .vscode/launch.json
 build_and_install.sh
+
+# Documentation (learning materials, not needed for runtime)
+docs/
