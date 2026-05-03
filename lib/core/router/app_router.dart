@@ -29,6 +29,8 @@ import '../../features/payments/presentation/screens/payment_confirm_screen.dart
 import '../../features/tools/presentation/screens/tools_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/settings/presentation/screens/edit_profile_screen.dart';
+import '../../features/onboarding/presentation/screens/welcome_screen.dart';
+import '../../features/onboarding/presentation/screens/onboarding_flow_screen.dart';
 import '../../shared/widgets/main_shell.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -40,7 +42,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (authState.isLoading) return null; // let splash show while loading
       final isAuthenticated = authState.value != null;
       final l = loc(state);
-      final isAuthRoute = l == '/login' || l == '/register' || l == '/forgot-password';
+      final isAuthRoute = l == '/login' || l == '/register' || l == '/forgot-password' || l == '/welcome' || l == '/onboarding';
       // Never redirect away from splash — it navigates itself
       if (l == '/') return null;
       if (!isAuthenticated && !isAuthRoute) return '/login';
@@ -51,6 +53,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/',
         pageBuilder: (ctx, st) => _fadePage(st, const SplashScreen()),
+      ),
+      GoRoute(
+        path: '/welcome',
+        pageBuilder: (ctx, st) => _fadePage(st, const WelcomeScreen()),
+      ),
+      GoRoute(
+        path: '/onboarding',
+        pageBuilder: (ctx, st) => _fadePage(st, const OnboardingFlowScreen()),
       ),
       GoRoute(
         path: '/login',

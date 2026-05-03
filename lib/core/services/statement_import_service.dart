@@ -97,22 +97,26 @@ class StatementImportService {
   static Map<String, dynamic> _parseFields(String text) {
     return {
       'principal': _extractAmount(text, [
-        r'(?<!Dropline\s)(?<!Utilized\s)(?<!Available\s)Loan Amount\s*\([^)]*\)\s*([\d,]+\.?\d*)',
-        r'(?:sanctioned|disbursed)\s*(?:loan\s*)?amount\s*[:\(₹Rs.]*\s*([\d,]+\.?\d*)',
-        r'principal\s*(?:amount)?\s*[:\(₹Rs.]*\s*([\d,]+\.?\d*)',
-        r'Dropline Loan Amount\s*\([^)]*\)\s*([\d,]+\.?\d*)',
+        r'Loan Amount\s*\([^)]*\)\s*([\d,]+\.?\d*)',
+        r'(?:sanctioned|disbursed)\s*(?:loan\s*)?amount\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
+        r'principal\s*(?:amount)?\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
+        r'Dropline\s*Loan\s*Amount\s*\([^)]*\)\s*([\d,]+\.?\d*)',
       ]),
       'interestRate': _extractRate(text),
       'tenureMonths': _extractTenure(text),
       'monthlyEmi': _extractAmount(text, [
-        r'(?:monthly\s*)?emi\s*(?:amount)?\s*[:\(₹Rs.]*\s*([\d,]+\.?\d*)',
-        r'instalment\s*amount\s*[:\(₹Rs.]*\s*([\d,]+\.?\d*)',
-        r'equated\s*monthly\s*instalment\s*[:\(₹Rs.]*\s*([\d,]+\.?\d*)',
-        r'monthly\s*instalment\s*[:\(₹Rs.]*\s*([\d,]+\.?\d*)',
+        r'Instalment\s*Amount\s*\([^)]*\)\s*([\d,]+\.?\d*)',
+        r'(?:monthly\s*)?emi\s*(?:amount)?\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
+        r'instalment\s*amount\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
+        r'equated\s*monthly\s*instalment\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
+        r'monthly\s*instalment\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
       ]),
       'startDate': _extractDate(text),
       'lenderName': _extractLender(text),
       'loanName': _extractLoanType(text),
+      'processingFee': _extractProcessingFee(text),
+      'bounceCharges': _extractBounceCharges(text),
+      'latePaymentCharges': _extractLateCharges(text),
     };
   }
 
@@ -131,7 +135,7 @@ class StatementImportService {
 
   static double? _extractRate(String text) {
     final patterns = [
-      r'Current\s*Rat(?:e)?\s*(?:of\s*Interest)?\s*[:\(\s%]*([0-9.]+)',
+      r'Current\s*Rat(?:e)?\s*(?:of\s*Interest)?\s*(?:Per\s*Annum)?\s*[:\(\s%]*([0-9.]+)',
       r'(?:rate\s*of\s*interest|roi|interest\s*rate)\s*[:\s%\(]*([0-9.]+)',
       r'([0-9.]+)\s*%\s*(?:p\.?a\.?|per\s*annum)',
       r'Annual.*?Charge.*?([0-9.]+)\s*%',
@@ -148,6 +152,7 @@ class StatementImportService {
 
   static int? _extractTenure(String text) {
     final patterns = [
+      r'Loan\s*Tenure\s*\(In\s*Months\)\s*([0-9]+)',
       r'(?:tenure|loan\s*period|repayment\s*period|no\.?\s*of\s*(?:emi|instalment)s?)\s*[:\s]*([0-9]+)\s*(?:months?|mos?)',
       r'(?:tenure|loan\s*period|repayment\s*period)\s*[:\s]*([0-9]+)\s*(?:years?|yrs?)',
       r'Total\s*(?:No\.?\s*of\s*)?(?:EMI|Instalment)s?\s*[:\s]*([0-9]+)',
@@ -157,7 +162,7 @@ class StatementImportService {
       if (match != null) {
         final v = int.tryParse(match.group(1) ?? '');
         if (v != null && v > 0 && v <= 360) {
-          return i == 1 ? v * 12 : v; // convert years to months
+          return (i == 2) ? v * 12 : v;
         }
       }
     }
@@ -165,16 +170,23 @@ class StatementImportService {
   }
 
   static String? _extractDate(String text) {
-    // DD/MM/YYYY or DD-MM-YYYY
-    final match = RegExp(
+    final patterns = [
+      r'Loan\s*Creation\s*Date\s*(\d{1,2})[-\/](\w{3})[-\/](\d{4})',
       r'(?:disbursement|start|commencement|loan)\s*date[:\s]*(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})',
-      caseSensitive: false,
-    ).firstMatch(text);
-    if (match != null) {
-      final d = match.group(1)!.padLeft(2, '0');
-      final m = match.group(2)!.padLeft(2, '0');
-      final y = match.group(3)!;
-      return '$y-$m-$d';
+    ];
+    for (final pattern in patterns) {
+      final match = RegExp(pattern, caseSensitive: false).firstMatch(text);
+      if (match != null) {
+        final d = match.group(1)!.padLeft(2, '0');
+        final m = match.group(2)!;
+        final y = match.group(3)!;
+        if (m.length == 3) {
+          final monthMap = {'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06', 'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'};
+          final monthNum = monthMap[m.toLowerCase()] ?? '01';
+          return '$y-$monthNum-$d';
+        }
+        return '$y-${m.padLeft(2, '0')}-$d';
+      }
     }
     return null;
   }
@@ -189,6 +201,32 @@ class StatementImportService {
       if (text.toLowerCase().contains(bank.toLowerCase())) return bank;
     }
     return null;
+  }
+
+  static double? _extractProcessingFee(String text) {
+    final patterns = [
+      r'PROCESSING\s*FEE\s*Deducted\s*From\s*Loan\s*Amount\s*([\d,]+\.?\d*)',
+      r'processing\s*(?:fee|charge)s?\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
+    ];
+    return _extractAmount(text, patterns);
+  }
+
+  static double? _extractBounceCharges(String text) {
+    final patterns = [
+      r'Bounce\s*Charges?\s*\([^)]*\)\s*([\d,]+\.?\d*)',
+      r'bounce\s*charges?\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
+      r'Total.*?bounce.*?([\d,]+\.?\d*)',
+    ];
+    return _extractAmount(text, patterns);
+  }
+
+  static double? _extractLateCharges(String text) {
+    final patterns = [
+      r'Late\s*Payment\s*Charges?\s*\([^)]*\)\s*([\d,]+\.?\d*)',
+      r'late\s*(?:payment)?\s*charges?\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
+      r'penal\s*(?:interest|charges?)\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
+    ];
+    return _extractAmount(text, patterns);
   }
 
   static String? _extractLoanType(String text) {

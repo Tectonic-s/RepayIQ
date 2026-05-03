@@ -14,7 +14,7 @@ class LoanLocalDataSource {
     final path = join(await getDatabasesPath(), 'repayiq.db');
     return openDatabase(
       path,
-      version: 1,
+      version: 3,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE loans (
@@ -31,9 +31,45 @@ class LoanLocalDataSource {
             calculationMethod TEXT NOT NULL,
             memberId TEXT,
             status TEXT NOT NULL,
-            createdAt TEXT NOT NULL
+            createdAt TEXT NOT NULL,
+            processingFee REAL DEFAULT 0.0,
+            bounceCharges REAL DEFAULT 0.0,
+            latePaymentCharges REAL DEFAULT 0.0
           )
         ''');
+        await db.execute('''
+          CREATE TABLE user_profile (
+            userId TEXT PRIMARY KEY,
+            monthlyIncome REAL NOT NULL,
+            monthlyExpenses REAL NOT NULL,
+            debtFreeGoalDate TEXT,
+            enableReminders INTEGER NOT NULL,
+            enableAiNudges INTEGER NOT NULL,
+            createdAt TEXT NOT NULL,
+            updatedAt TEXT NOT NULL
+          )
+        ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('ALTER TABLE loans ADD COLUMN processingFee REAL DEFAULT 0.0');
+          await db.execute('ALTER TABLE loans ADD COLUMN bounceCharges REAL DEFAULT 0.0');
+          await db.execute('ALTER TABLE loans ADD COLUMN latePaymentCharges REAL DEFAULT 0.0');
+        }
+        if (oldVersion < 3) {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS user_profile (
+              userId TEXT PRIMARY KEY,
+              monthlyIncome REAL NOT NULL,
+              monthlyExpenses REAL NOT NULL,
+              debtFreeGoalDate TEXT,
+              enableReminders INTEGER NOT NULL,
+              enableAiNudges INTEGER NOT NULL,
+              createdAt TEXT NOT NULL,
+              updatedAt TEXT NOT NULL
+            )
+          ''');
+        }
       },
     );
   }

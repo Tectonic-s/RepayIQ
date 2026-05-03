@@ -26,6 +26,17 @@ class NotificationService {
       },
     );
 
+    // Request permissions explicitly on iOS
+    final iosPlugin = _plugin.resolvePlatformSpecificImplementation<
+        IOSFlutterLocalNotificationsPlugin>();
+    if (iosPlugin != null) {
+      await iosPlugin.requestPermissions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    }
+
     // Handle notification tap when app was terminated
     final launchDetails = await _plugin.getNotificationAppLaunchDetails();
     if (launchDetails?.didNotificationLaunchApp == true) {

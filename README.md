@@ -158,7 +158,7 @@ PDF             pdf
 | Platform | Minimum Version |
 |----------|----------------|
 | Android  | 8.0 (API Level 26) |
-| iOS      | 13.0 |
+| iOS      | 15.5 |
 
 ---
 

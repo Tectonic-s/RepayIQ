@@ -177,6 +177,17 @@ class _InfoGrid extends StatelessWidget {
           _InfoRow('Reminder', '${loan.reminderDays} days before due'),
           _InfoRow('Status', loan.status),
           _InfoRow('Amount Paid', Formatters.currency(loan.monthlyEmi * paidCount)),
+          if (loan.totalAdditionalCharges > 0) ...[
+            const Divider(height: 20),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text('Additional Charges', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.warning)),
+            ),
+            if (loan.processingFee > 0) _InfoRow('Processing Fee', Formatters.currency(loan.processingFee)),
+            if (loan.bounceCharges > 0) _InfoRow('Bounce Charges', Formatters.currency(loan.bounceCharges)),
+            if (loan.latePaymentCharges > 0) _InfoRow('Late Payment Charges', Formatters.currency(loan.latePaymentCharges)),
+            _InfoRowColoured('Total Additional Charges', Formatters.currency(loan.totalAdditionalCharges), AppColors.warning),
+          ],
           const Divider(height: 20),
           _InfoRowColoured('Dues Completed', '$paidCount / $duableMonths', AppColors.success, animated: true),
           if (missedCount > 0)

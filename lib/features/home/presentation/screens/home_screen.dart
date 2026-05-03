@@ -97,7 +97,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     key: ValueKey(active.length),
                     child: Column(
                       key: ValueKey(active.map((l) => l.id).join()),
-                      children: active.take(3).map((l) => _LoanTile(loan: l)).toList(),
+                      children: active.take(3).map((l) => _LoanTile(
+                        loan: l,
+                        paidKeys: paidKeysByLoan[l.id] ?? {},
+                      )).toList(),
                     ),
                   ),
                 ],
@@ -130,6 +133,8 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final photoImage = photoBase64 != null ? MemoryImage(base64Decode(photoBase64!)) : null;
+    
     return Padding(
       padding: EdgeInsets.fromLTRB(20, top + 16, 16, 0),
       child: Row(
@@ -153,10 +158,8 @@ class _TopBar extends StatelessWidget {
             child: CircleAvatar(
               radius: 18,
               backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-              backgroundImage: photoBase64 != null
-                  ? MemoryImage(base64Decode(photoBase64!))
-                  : null,
-              child: photoBase64 == null
+              backgroundImage: photoImage,
+              child: photoImage == null
                   ? const Icon(Icons.person_outline, color: AppColors.primary, size: 18)
                   : null,
             ),
@@ -443,7 +446,8 @@ class _SectionHeader extends StatelessWidget {
 
 class _LoanTile extends ConsumerWidget {
   final Loan loan;
-  const _LoanTile({required this.loan});
+  final Set<String> paidKeys; // Pass from parent instead of watching
+  const _LoanTile({required this.loan, required this.paidKeys});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -451,8 +455,7 @@ class _LoanTile extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cs = Theme.of(context).colorScheme;
     final currentMonthKey = LoanPayment.keyFromDate(DateTime.now());
-    final payments = ref.watch(paymentsProvider(loan.id)).value ?? [];
-    final isPaid = payments.any((p) => p.monthKey == currentMonthKey);
+    final isPaid = paidKeys.contains(currentMonthKey);
 
     return GestureDetector(
       onTap: () => context.push('/loans/${loan.id}'),
@@ -550,7 +553,7 @@ class _LoanTile extends ConsumerWidget {
             const SizedBox(height: 12),
             // This month payment toggle
             GestureDetector(
-              onTap: () => _togglePayment(ref, loan, payments, currentMonthKey, isPaid),
+              onTap: () => _togglePayment(ref, loan, currentMonthKey, isPaid),
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 10),
@@ -595,10 +598,13 @@ class _LoanTile extends ConsumerWidget {
   Future<void> _togglePayment(
     WidgetRef ref,
     Loan loan,
-    List<LoanPayment> payments,
     String monthKey,
     bool isPaid,
   ) async {
+    // Fetch payments only when toggling
+    final paymentsAsync = ref.read(paymentsProvider(loan.id));
+    final payments = paymentsAsync.value ?? <LoanPayment>[];
+    
     await ref.read(paymentNotifierProvider.notifier).togglePayment(
       loanId: loan.id,
       monthKey: monthKey,
@@ -640,7 +646,8 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Tap + to add your first loan',
+            'Tap + to add your first loan\nor load demo data from Settings',
+            textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: cs.onSurface.withValues(alpha: 0.38)),
           ),
         ],

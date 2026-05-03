@@ -13,6 +13,9 @@ class Loan {
   final String? memberId;
   final String status;
   final DateTime createdAt;
+  final double processingFee;
+  final double bounceCharges;
+  final double latePaymentCharges;
 
   const Loan({
     required this.id,
@@ -29,6 +32,9 @@ class Loan {
     this.memberId,
     required this.status,
     required this.createdAt,
+    this.processingFee = 0.0,
+    this.bounceCharges = 0.0,
+    this.latePaymentCharges = 0.0,
   });
 
   int get monthsElapsed {
@@ -74,6 +80,8 @@ class Loan {
     return true;
   }
 
+  double get totalAdditionalCharges => processingFee + bounceCharges + latePaymentCharges;
+
   Loan copyWith({
     String? id,
     String? loanName,
@@ -89,6 +97,9 @@ class Loan {
     String? memberId,
     String? status,
     DateTime? createdAt,
+    double? processingFee,
+    double? bounceCharges,
+    double? latePaymentCharges,
   }) {
     return Loan(
       id: id ?? this.id,
@@ -105,6 +116,9 @@ class Loan {
       memberId: memberId ?? this.memberId,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
+      processingFee: processingFee ?? this.processingFee,
+      bounceCharges: bounceCharges ?? this.bounceCharges,
+      latePaymentCharges: latePaymentCharges ?? this.latePaymentCharges,
     );
   }
 
@@ -123,6 +137,9 @@ class Loan {
         'memberId': memberId,
         'status': status,
         'createdAt': createdAt.toIso8601String(),
+        'processingFee': processingFee,
+        'bounceCharges': bounceCharges,
+        'latePaymentCharges': latePaymentCharges,
       };
 
   factory Loan.fromMap(Map<String, dynamic> map) => Loan(
@@ -140,5 +157,8 @@ class Loan {
         memberId: map['memberId'] as String?,
         status: map['status'] as String,
         createdAt: DateTime.parse(map['createdAt'] as String),
+        processingFee: (map['processingFee'] as num?)?.toDouble() ?? 0.0,
+        bounceCharges: (map['bounceCharges'] as num?)?.toDouble() ?? 0.0,
+        latePaymentCharges: (map['latePaymentCharges'] as num?)?.toDouble() ?? 0.0,
       );
 }

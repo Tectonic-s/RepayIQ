@@ -69,6 +69,9 @@ class LoanNotifier extends StateNotifier<AsyncValue<void>> {
     required int reminderDays,
     required String calculationMethod,
     String? memberId,
+    double processingFee = 0.0,
+    double bounceCharges = 0.0,
+    double latePaymentCharges = 0.0,
   }) async {
     state = const AsyncValue.loading();
     final emi = calculationMethod == AppConstants.flatRate
@@ -90,6 +93,9 @@ class LoanNotifier extends StateNotifier<AsyncValue<void>> {
       memberId: memberId,
       status: AppConstants.statusActive,
       createdAt: DateTime.now(),
+      processingFee: processingFee,
+      bounceCharges: bounceCharges,
+      latePaymentCharges: latePaymentCharges,
     );
     state = await AsyncValue.guard(() => _repo.addLoan(loan));
     await _scheduleNudgeIfNeeded();

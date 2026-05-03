@@ -25,6 +25,8 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
   final _tenureCtrl = TextEditingController();
   final _emisCompletedCtrl = TextEditingController();
   final _processingFeeCtrl = TextEditingController(text: '0');
+  final _bounceChargesCtrl = TextEditingController(text: '0');
+  final _lateChargesCtrl = TextEditingController(text: '0');
 
   String _loanType = AppConstants.loanTypes.first;
   String _method = AppConstants.reducingBalance;
@@ -62,6 +64,8 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
     _tenureCtrl.dispose();
     _emisCompletedCtrl.dispose();
     _processingFeeCtrl.dispose();
+    _bounceChargesCtrl.dispose();
+    _lateChargesCtrl.dispose();
     super.dispose();
   }
 
@@ -89,6 +93,9 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
         if (data['principal'] != null) _principalCtrl.text = (data['principal'] as num).toStringAsFixed(0);
         if (data['interestRate'] != null) _rateCtrl.text = (data['interestRate'] as num).toString();
         if (data['tenureMonths'] != null) _tenureCtrl.text = (data['tenureMonths'] as num).toInt().toString();
+        if (data['processingFee'] != null) _processingFeeCtrl.text = (data['processingFee'] as num).toStringAsFixed(0);
+        if (data['bounceCharges'] != null) _bounceChargesCtrl.text = (data['bounceCharges'] as num).toStringAsFixed(0);
+        if (data['latePaymentCharges'] != null) _lateChargesCtrl.text = (data['latePaymentCharges'] as num).toStringAsFixed(0);
         if (data['startDate'] != null) {
           final parsed = DateTime.tryParse(data['startDate'] as String);
           if (parsed != null) {
@@ -103,6 +110,9 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
         if (data['interestRate'] != null) filled.add('rate');
         if (data['tenureMonths'] != null) filled.add('tenure');
         if (data['startDate'] != null) filled.add('date');
+        if (data['processingFee'] != null) filled.add('processing fee');
+        if (data['bounceCharges'] != null) filled.add('bounce charges');
+        if (data['latePaymentCharges'] != null) filled.add('late charges');
         final msg = filled.isEmpty
             ? 'No details found — please fill in manually'
             : 'Extracted: ${filled.join(', ')} — review before saving';
@@ -157,6 +167,9 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
       dueDay: _dueDay,
       reminderDays: _reminderDays,
       calculationMethod: _method,
+      processingFee: double.tryParse(_processingFeeCtrl.text) ?? 0.0,
+      bounceCharges: double.tryParse(_bounceChargesCtrl.text) ?? 0.0,
+      latePaymentCharges: double.tryParse(_lateChargesCtrl.text) ?? 0.0,
     );
 
     if (!mounted) return;
@@ -385,6 +398,61 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
               const SizedBox(height: 6),
               Text('We\'ll ask you to confirm which of these were paid on the next screen.',
                   style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.38))),
+              const SizedBox(height: 20),
+
+              // ── Additional Charges Section
+              LoanFormLabel('Additional Charges (Optional)'),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                ),
+                child: const Row(children: [
+                  Icon(Icons.receipt_long_outlined, color: AppColors.primary, size: 16),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('These charges will be included in total cost calculations and AI advice.',
+                      style: TextStyle(fontSize: 11, color: AppColors.primary))),
+                ]),
+              ),
+              const SizedBox(height: 12),
+              AppTextField(
+                label: 'Processing Fee (₹)',
+                hint: '0',
+                controller: _processingFeeCtrl,
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return null;
+                  if (double.tryParse(v) == null) return 'Invalid amount';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              AppTextField(
+                label: 'Total Bounce Charges (₹)',
+                hint: '0',
+                controller: _bounceChargesCtrl,
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return null;
+                  if (double.tryParse(v) == null) return 'Invalid amount';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              AppTextField(
+                label: 'Total Late Payment Charges (₹)',
+                hint: '0',
+                controller: _lateChargesCtrl,
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return null;
+                  if (double.tryParse(v) == null) return 'Invalid amount';
+                  return null;
+                },
+              ),
               const SizedBox(height: 16),
 
               LoanFormLabel('Calculation Method'),

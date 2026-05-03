@@ -6,7 +6,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/profile_photo_provider.dart';
 import '../../../../core/providers/theme_provider.dart';
+import '../../../../core/utils/demo_data_seeder.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../loans/presentation/providers/loan_providers.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -128,6 +130,27 @@ class SettingsScreen extends ConsumerWidget {
                 ]),
                 const SizedBox(height: 24),
 
+                // ── Developer ─────────────────────────────────────────────
+                _SectionHeader('Developer'),
+                const SizedBox(height: 8),
+                _TileGroup(isDark: isDark, tiles: [
+                  _SettingsTile(
+                    icon: Icons.auto_awesome,
+                    label: 'Load Demo Data',
+                    color: AppColors.success,
+                    onTap: () => _loadDemoData(context, ref),
+                    showChevron: false,
+                  ),
+                  _SettingsTile(
+                    icon: Icons.refresh,
+                    label: 'Reset Demo Data',
+                    color: AppColors.warning,
+                    onTap: () => _resetDemoData(context, ref),
+                    showChevron: false,
+                  ),
+                ]),
+                const SizedBox(height: 24),
+
                 // ── Danger zone ───────────────────────────────────────────
                 _SectionHeader('Account Actions'),
                 const SizedBox(height: 8),
@@ -162,6 +185,81 @@ class SettingsScreen extends ConsumerWidget {
               ref.read(authNotifierProvider.notifier).signOut();
             },
             child: const Text('Log Out', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _loadDemoData(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Load Demo Data'),
+        content: const Text(
+          'This will add 3 sample loans (Home, Vehicle, Personal) '
+          'to demonstrate the app features.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Loading demo data...'), duration: Duration(seconds: 2)),
+                );
+              }
+              final repo = ref.read(loanRepositoryProvider);
+              await DemoDataSeeder.forceSeed(repo);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('✓ Demo data loaded'), backgroundColor: AppColors.success),
+                );
+              }
+            },
+            child: const Text('Load', style: TextStyle(color: AppColors.success)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _resetDemoData(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reset Demo Data'),
+        content: const Text(
+          'This will delete all loans and re-add 3 demo loans. '
+          'Use this to quickly reset the app for demo purposes.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              // Show loading
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Resetting demo data...'), duration: Duration(seconds: 2)),
+                );
+              }
+              // Delete all loans
+              final loans = ref.read(loansStreamProvider).value ?? [];
+              final repo = ref.read(loanRepositoryProvider);
+              for (final loan in loans) {
+                await repo.deleteLoan(loan.id);
+              }
+              // Force seed demo data
+              await DemoDataSeeder.forceSeed(repo);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('✓ Demo data reset complete'), backgroundColor: AppColors.success),
+                );
+              }
+            },
+            child: const Text('Reset', style: TextStyle(color: AppColors.warning)),
           ),
         ],
       ),
