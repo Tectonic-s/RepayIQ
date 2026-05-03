@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
-import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/loans/domain/entities/loan.dart';
@@ -42,7 +41,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (authState.isLoading) return null; // let splash show while loading
       final isAuthenticated = authState.value != null;
       final l = loc(state);
-      final isAuthRoute = l == '/login' || l == '/register' || l == '/forgot-password' || l == '/welcome' || l == '/onboarding';
+      final isAuthRoute = l == '/login' || l == '/forgot-password' || l == '/welcome' || l == '/onboarding';
       // Never redirect away from splash — it navigates itself
       if (l == '/') return null;
       if (!isAuthenticated && !isAuthRoute) return '/login';
@@ -59,10 +58,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (ctx, st) => CustomTransitionPage(
           key: st.pageKey,
           child: const WelcomeScreen(),
-          transitionDuration: const Duration(milliseconds: 600),
+          transitionDuration: const Duration(milliseconds: 700),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(
-              opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+              opacity: CurvedAnimation(parent: animation, curve: Curves.easeInOut),
               child: child,
             );
           },
@@ -93,24 +92,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (ctx, st) => CustomTransitionPage(
           key: st.pageKey,
           child: const LoginScreen(),
-          transitionDuration: const Duration(milliseconds: 500),
+          transitionDuration: const Duration(milliseconds: 400),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.0, 1.0),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic)),
-              child: FadeTransition(
-                opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
-                child: child,
-              ),
+            return FadeTransition(
+              opacity: CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+              child: child,
             );
           },
         ),
-      ),
-      GoRoute(
-        path: '/register',
-        pageBuilder: (ctx, st) => _fadePage(st, const RegisterScreen()),
       ),
       GoRoute(
         path: '/forgot-password',
