@@ -27,9 +27,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   late final Animation<double> _taglineOpacity;
   late final Animation<Offset> _taglineSlide;
 
-  // Stage 4 — hold, then whole screen fades out slowly (0.78 → 1.0)
-  late final Animation<double> _screenOpacity;
-
   bool _navigated = false;
   bool _animationDone = false;
   bool _authResolved = false;
@@ -40,7 +37,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3800),
+      duration: const Duration(milliseconds: 2200),
     );
 
     _logoScale = Tween(begin: 0.5, end: 1.0).animate(
@@ -78,13 +75,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       CurvedAnimation(
         parent: _ctrl,
         curve: const Interval(0.5, 0.72, curve: Curves.easeOut),
-      ),
-    );
-
-    _screenOpacity = Tween(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _ctrl,
-        curve: const Interval(0.78, 1.0, curve: Curves.easeInOut),
       ),
     );
 
@@ -154,11 +144,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     return AnimatedBuilder(
       animation: _ctrl,
       builder: (context, child) {
-        return Opacity(
-          opacity: _screenOpacity.value,
-          child: Scaffold(
-            backgroundColor: AppColors.primary,
-            body: Center(
+        return Scaffold(
+          backgroundColor: AppColors.primary,
+          body: Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
