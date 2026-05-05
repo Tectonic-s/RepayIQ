@@ -89,32 +89,38 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     _ctrl.forward();
 
     // Auth resolved — mark and try navigate
-    // Check immediately in case auth is already resolved
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final current = ref.read(authStateProvider);
-      if (!current.isLoading) {
+      if (!current.isLoading && !_authResolved) {
         _authResolved = true;
         _tryNavigate();
       }
-      ref.listenManual(authStateProvider, (prev, next) {
-        if (!next.isLoading) {
-          _authResolved = true;
-          _tryNavigate();
-        }
-      });
+    });
+    
+    // Listen for auth changes
+    ref.listenManual(authStateProvider, (prev, next) {
+      if (!next.isLoading && !_authResolved) {
+        _authResolved = true;
+        _tryNavigate();
+      }
     });
   }
 
   /// Only navigates when BOTH animation is done AND auth is resolved.
   void _tryNavigate() {
-    if (!_animationDone || !_authResolved) return;
+    if (!_animationDone || !_authResolved || _navigated) return;
     _navigate();
   }
 
   void _navigate() {
     if (_navigated || !mounted) return;
     _navigated = true;
-    _checkFirstLaunch();
+    
+    // Small delay to ensure router is ready
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
+      _checkFirstLaunch();
+    });
   }
 
   Future<void> _checkFirstLaunch() async {

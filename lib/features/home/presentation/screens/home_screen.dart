@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/profile_photo_provider.dart';
 import '../../../../core/services/overdue_detector.dart';
@@ -26,7 +27,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await OverdueDetector.check(ref.read(loanRepositoryProvider));
+      _showAiTeaserIfFirstTime();
     });
+  }
+
+  Future<void> _showAiTeaserIfFirstTime() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeenAiTeaser = prefs.getBool('has_seen_ai_teaser') ?? false;
+    if (!hasSeenAiTeaser && mounted) {
+      await Future.delayed(const Duration(milliseconds: 800));
+      if (!mounted) return;
+      await _showAiTeaser();
+      await prefs.setBool('has_seen_ai_teaser', true);
+    }
+  }
+
+  Future<void> _showAiTeaser() async {
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _AiTeaserSheet(onTryNow: () {
+        Navigator.pop(ctx);
+        context.push('/ai');
+      }),
+    );
   }
 
   @override
@@ -49,7 +74,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: _TopBar(
               top: top,
               photoBase64: photoBase64,
-              onCalcTap: () => context.push('/calculator'),
               onAiTap: () => context.push('/ai'),
               onProfileTap: () => context.push('/settings'),
             ),
@@ -120,12 +144,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 class _TopBar extends StatelessWidget {
   final double top;
   final String? photoBase64;
-  final VoidCallback onCalcTap, onAiTap, onProfileTap;
+  final VoidCallback onAiTap, onProfileTap;
 
   const _TopBar({
     required this.top,
     required this.photoBase64,
-    required this.onCalcTap,
     required this.onAiTap,
     required this.onProfileTap,
   });
@@ -150,7 +173,6 @@ class _TopBar extends StatelessWidget {
               ),
             ),
           ),
-          _IconBtn(icon: Icons.calculate_outlined, onTap: onCalcTap),
           _IconBtn(icon: Icons.auto_awesome_outlined, onTap: onAiTap),
           const SizedBox(width: 4),
           GestureDetector(
@@ -649,6 +671,167 @@ class _EmptyState extends StatelessWidget {
             'Tap + to add your first loan\nor load demo data from Settings',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: cs.onSurface.withValues(alpha: 0.38)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── AI Teaser Bottom Sheet ────────────────────────────────────────────────────
+
+class _AiTeaserSheet extends StatelessWidget {
+  final VoidCallback onTryNow;
+  const _AiTeaserSheet({required this.onTryNow});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).padding.bottom + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Icon with gradient background
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFFEC4899)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.auto_awesome, color: Colors.white, size: 36),
+          ),
+          const SizedBox(height: 20),
+          // Title
+          const Text(
+            'Meet Your AI Financial Co-pilot',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Subtitle
+          Text(
+            'Get instant answers about your loans, compare offers, and receive personalized repayment strategies.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Example questions
+          _QuestionChip(text: 'Can I afford a new loan?'),
+          const SizedBox(height: 8),
+          _QuestionChip(text: 'What is my debt-free date?'),
+          const SizedBox(height: 8),
+          _QuestionChip(text: 'Which loan should I clear first?'),
+          const SizedBox(height: 24),
+          // CTA Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: onTryNow,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 0,
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.auto_awesome, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Try AI Co-pilot Now',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Dismiss button
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Maybe Later'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuestionChip extends StatelessWidget {
+  final String text;
+  const _QuestionChip({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.05)
+            : AppColors.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.1)
+              : AppColors.primary.withValues(alpha: 0.15),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.chat_bubble_outline,
+            size: 16,
+            color: AppColors.primary.withValues(alpha: 0.7),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
           ),
         ],
       ),

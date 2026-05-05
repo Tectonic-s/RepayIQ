@@ -38,12 +38,17 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/',
     redirect: (context, state) {
-      if (authState.isLoading) return null; // let splash show while loading
-      final isAuthenticated = authState.value != null;
       final l = loc(state);
-      final isAuthRoute = l == '/login' || l == '/forgot-password' || l == '/welcome' || l == '/onboarding';
-      // Never redirect away from splash — it navigates itself
+      
+      // Never redirect away from splash — it handles its own navigation
       if (l == '/') return null;
+      
+      // Let auth routes load without interference
+      if (authState.isLoading) return null;
+      
+      final isAuthenticated = authState.value != null;
+      final isAuthRoute = l == '/login' || l == '/forgot-password' || l == '/welcome' || l == '/onboarding';
+      
       if (!isAuthenticated && !isAuthRoute) return '/login';
       if (isAuthenticated && isAuthRoute) return '/home';
       return null;
@@ -110,7 +115,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (ctx, st, child) => _fadePage(st, MainShell(child: child)),
         routes: [
           GoRoute(path: '/home', builder: (ctx, st) => const HomeScreen()),
-          GoRoute(path: '/loans', builder: (ctx, st) => const MyLoansScreen()),
+          GoRoute(path: '/calculator', builder: (ctx, st) => const EmiCalculatorScreen()),
           GoRoute(path: '/dashboard', builder: (ctx, st) => const DashboardScreen()),
           GoRoute(path: '/tools', builder: (ctx, st) => const ToolsScreen()),
           GoRoute(path: '/settings', builder: (ctx, st) => const SettingsScreen()),
@@ -118,47 +123,104 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
       // Full-screen routes
-      GoRoute(path: '/calculator', builder: (ctx, st) => const EmiCalculatorScreen()),
-      GoRoute(path: '/reports', builder: (ctx, st) => const ReportsScreen()),
-      GoRoute(path: '/score', builder: (ctx, st) => const ScoreScreen()),
-      GoRoute(path: '/budget', builder: (ctx, st) => const BudgetScreen()),
-      GoRoute(path: '/calendar', builder: (ctx, st) => const CalendarScreen()),
-      GoRoute(path: '/family', builder: (ctx, st) => const FamilyScreen()),
-      GoRoute(path: '/ai', builder: (ctx, st) => const AiCopilotScreen()),
+      GoRoute(
+        path: '/loans',
+        pageBuilder: (ctx, st) => _slideRightPage(st, const MyLoansScreen()),
+      ),
+      GoRoute(
+        path: '/reports',
+        pageBuilder: (ctx, st) => _slideUpPage(st, const ReportsScreen()),
+      ),
+      GoRoute(
+        path: '/score',
+        pageBuilder: (ctx, st) => _slideUpPage(st, const ScoreScreen()),
+      ),
+      GoRoute(
+        path: '/budget',
+        pageBuilder: (ctx, st) => _slideUpPage(st, const BudgetScreen()),
+      ),
+      GoRoute(
+        path: '/calendar',
+        pageBuilder: (ctx, st) => _slideUpPage(st, const CalendarScreen()),
+      ),
+      GoRoute(
+        path: '/family',
+        pageBuilder: (ctx, st) => _slideUpPage(st, const FamilyScreen()),
+      ),
+      GoRoute(
+        path: '/ai',
+        pageBuilder: (ctx, st) => _slideUpPage(st, const AiCopilotScreen()),
+      ),
       GoRoute(
         path: '/payment-confirm/:loanId',
-        builder: (ctx, st) => PaymentConfirmScreen(loanId: st.pathParameters['loanId']!),
+        pageBuilder: (ctx, st) => _slideRightPage(
+          st,
+          PaymentConfirmScreen(loanId: st.pathParameters['loanId']!),
+        ),
       ),
       GoRoute(
         path: '/past-payments',
-        builder: (ctx, st) => PastPaymentsScreen(loan: st.extra as Loan),
+        pageBuilder: (ctx, st) => _slideRightPage(
+          st,
+          PastPaymentsScreen(loan: st.extra as Loan),
+        ),
       ),
-      GoRoute(path: '/settings/edit-profile', builder: (ctx, st) => const EditProfileScreen()),
+      GoRoute(
+        path: '/settings/edit-profile',
+        pageBuilder: (ctx, st) => _slideRightPage(st, const EditProfileScreen()),
+      ),
       // /loans/add now shows the chooser screen
-      GoRoute(path: '/loans/add', builder: (ctx, st) => const LoanTypeChooserScreen()),
-      GoRoute(path: '/loans/add/new', builder: (ctx, st) => AddEditLoanScreen(prefill: st.extra as Map<String, dynamic>?)),
-      GoRoute(path: '/loans/add/existing', builder: (ctx, st) => const AddExistingLoanScreen()),
+      GoRoute(
+        path: '/loans/add',
+        pageBuilder: (ctx, st) => _slideUpPage(st, const LoanTypeChooserScreen()),
+      ),
+      GoRoute(
+        path: '/loans/add/new',
+        pageBuilder: (ctx, st) => _slideRightPage(
+          st,
+          AddEditLoanScreen(prefill: st.extra as Map<String, dynamic>?),
+        ),
+      ),
+      GoRoute(
+        path: '/loans/add/existing',
+        pageBuilder: (ctx, st) => _slideRightPage(st, const AddExistingLoanScreen()),
+      ),
       GoRoute(
         path: '/loans/:id',
-        builder: (ctx, st) => LoanDetailScreen(loanId: st.pathParameters['id']!),
+        pageBuilder: (ctx, st) => _slideRightPage(
+          st,
+          LoanDetailScreen(loanId: st.pathParameters['id']!),
+        ),
       ),
       GoRoute(
         path: '/loans/:id/edit',
-        builder: (ctx, st) => AddEditLoanScreen(loan: st.extra as Loan?),
+        pageBuilder: (ctx, st) => _slideRightPage(
+          st,
+          AddEditLoanScreen(loan: st.extra as Loan?),
+        ),
       ),
       GoRoute(
         path: '/loans/:id/amortisation',
-        builder: (ctx, st) => AmortisationScreen(loan: st.extra as Loan),
+        pageBuilder: (ctx, st) => _slideUpPage(
+          st,
+          AmortisationScreen(loan: st.extra as Loan),
+        ),
       ),
       GoRoute(
         path: '/loans/:id/prepayment',
-        builder: (ctx, st) => PrepaymentScreen(loan: st.extra as Loan),
+        pageBuilder: (ctx, st) => _slideUpPage(
+          st,
+          PrepaymentScreen(loan: st.extra as Loan),
+        ),
       ),
       GoRoute(
         path: '/loans/:id/documents',
-        builder: (ctx, st) => DocumentVaultScreen(
-          loanId: st.pathParameters['id']!,
-          loanName: (st.extra as String?) ?? 'Loan',
+        pageBuilder: (ctx, st) => _slideRightPage(
+          st,
+          DocumentVaultScreen(
+            loanId: st.pathParameters['id']!,
+            loanName: (st.extra as String?) ?? 'Loan',
+          ),
         ),
       ),
     ],
@@ -180,6 +242,47 @@ CustomTransitionPage<void> _fadePage(GoRouterState state, Widget child) {
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       return FadeTransition(
         opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+        child: child,
+      );
+    },
+  );
+}
+
+/// Slide up transition — used for modal-like screens
+CustomTransitionPage<void> _slideUpPage(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 400),
+    reverseTransitionDuration: const Duration(milliseconds: 300),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0.0, 1.0),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+        child: FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+/// Slide right transition — used for detail/edit screens
+CustomTransitionPage<void> _slideRightPage(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 350),
+    reverseTransitionDuration: const Duration(milliseconds: 300),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(1.0, 0.0),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
         child: child,
       );
     },
