@@ -68,15 +68,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       ),
     );
 
-    _taglineSlide = Tween(
-      begin: const Offset(0, 0.6),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _ctrl,
-        curve: const Interval(0.5, 0.72, curve: Curves.easeOut),
-      ),
-    );
+    _taglineSlide = Tween(begin: const Offset(0, 0.6), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _ctrl,
+            curve: const Interval(0.5, 0.72, curve: Curves.easeOut),
+          ),
+        );
 
     // Animation done — mark and try navigate
     _ctrl.addStatusListener((status) {
@@ -96,7 +94,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         _tryNavigate();
       }
     });
-    
+
     // Listen for auth changes
     ref.listenManual(authStateProvider, (prev, next) {
       if (!next.isLoading && !_authResolved) {
@@ -115,7 +113,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   void _navigate() {
     if (_navigated || !mounted) return;
     _navigated = true;
-    
+
     // Small delay to ensure router is ready
     Future.delayed(const Duration(milliseconds: 100), () {
       if (!mounted) return;
@@ -126,12 +124,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   Future<void> _checkFirstLaunch() async {
     final prefs = await SharedPreferences.getInstance();
     final hasSeenWelcome = prefs.getBool('has_seen_welcome') ?? false;
-    
+
     if (!mounted) return;
-    
+
     final authState = ref.read(authStateProvider);
     final isAuthenticated = authState.value != null;
-    
+
     if (!hasSeenWelcome && !isAuthenticated) {
       context.go('/welcome');
     } else {
@@ -170,27 +168,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                           width: 116,
                           height: 116,
                           fit: BoxFit.cover,
-<<<<<<< HEAD
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Logo — scale bounce + fade in
-                  ScaleTransition(
-                    scale: _logoScale,
-                    child: FadeTransition(
-                      opacity: _logoOpacity,
-                      child: Hero(
-                        tag: 'repayiq_logo',
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(26),
-                          child: Image.asset(
-                            'assets/images/logo_light.png',
-                            width: 116,
-                            height: 116,
-                            fit: BoxFit.cover,
-                          ),
-=======
->>>>>>> 46f1bc4 (UX and animation improvements)
                         ),
                       ),
                     ),
