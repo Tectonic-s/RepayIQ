@@ -15,9 +15,12 @@ class OnboardingFlowScreen extends ConsumerStatefulWidget {
   ConsumerState<OnboardingFlowScreen> createState() => _OnboardingFlowScreenState();
 }
 
-class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
+class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> with TickerProviderStateMixin {
   final _pageController = PageController();
   int _currentPage = 0;
+
+  // Form keys for validation
+  final _signUpFormKey = GlobalKey<FormState>();
 
   // Form data
   final _emailCtrl = TextEditingController();
@@ -28,8 +31,26 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
   bool _enableAiNudges = true;
   bool _isLoading = false;
 
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeInOut,
+    );
+    _fadeController.forward();
+  }
+
   @override
   void dispose() {
+    _fadeController.dispose();
     _pageController.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
@@ -39,21 +60,52 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
   }
 
   void _nextPage() {
+    // Validate first page before proceeding
+    if (_currentPage == 0) {
+      if (!_signUpFormKey.currentState!.validate()) {
+        return;
+      }
+      if (_emailCtrl.text.trim().isEmpty || _passwordCtrl.text.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter both email and password'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+      if (_passwordCtrl.text.length < 6) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password must be at least 6 characters'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+    }
+
     if (_currentPage < 3) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOutCubic,
-      );
+      _fadeController.reverse().then((_) {
+        _pageController.nextPage(
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOutCubic,
+        );
+        _fadeController.forward();
+      });
     } else {
       _completeOnboarding();
     }
   }
 
   void _previousPage() {
-    _pageController.previousPage(
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOutCubic,
-    );
+    _fadeController.reverse().then((_) {
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOutCubic,
+      );
+      _fadeController.forward();
+    });
   }
 
   Future<void> _completeOnboarding() async {
@@ -146,21 +198,28 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
             ),
             // Pages
             Expanded(
-              child: PageView(
-                controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(),
-                onPageChanged: (page) => setState(() => _currentPage = page),
-                children: [
-                  _SignUpPage(emailCtrl: _emailCtrl, passwordCtrl: _passwordCtrl),
-                  _IncomePage(incomeCtrl: _incomeCtrl),
-                  _ExpensesPage(expensesCtrl: _expensesCtrl),
-                  _PreferencesPage(
-                    enableReminders: _enableReminders,
-                    enableAiNudges: _enableAiNudges,
-                    onRemindersChanged: (v) => setState(() => _enableReminders = v),
-                    onAiNudgesChanged: (v) => setState(() => _enableAiNudges = v),
-                  ),
-                ],
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: PageView(
+                  controller: _pageController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  onPageChanged: (page) => setState(() => _currentPage = page),
+                  children: [
+                    _SignUpPage(
+                      formKey: _signUpFormKey,
+                      emailCtrl: _emailCtrl,
+                      passwordCtrl: _passwordCtrl,
+                    ),
+                    _IncomePage(incomeCtrl: _incomeCtrl),
+                    _ExpensesPage(expensesCtrl: _expensesCtrl),
+                    _PreferencesPage(
+                      enableReminders: _enableReminders,
+                      enableAiNudges: _enableAiNudges,
+                      onRemindersChanged: (v) => setState(() => _enableReminders = v),
+                      onAiNudgesChanged: (v) => setState(() => _enableAiNudges = v),
+                    ),
+                  ],
+                ),
               ),
             ),
             // Next button
@@ -181,41 +240,59 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
 
 // Page 1: Sign Up
 class _SignUpPage extends StatelessWidget {
+  final GlobalKey<FormState> formKey;
   final TextEditingController emailCtrl;
   final TextEditingController passwordCtrl;
-  const _SignUpPage({required this.emailCtrl, required this.passwordCtrl});
+  const _SignUpPage({
+    required this.formKey,
+    required this.emailCtrl,
+    required this.passwordCtrl,
+  });
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Create Account',
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.5),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Let\'s start by setting up your account',
-            style: TextStyle(fontSize: 15, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
-          ),
-          const SizedBox(height: 32),
-          AppTextField(
-            label: 'Email',
-            hint: 'your@email.com',
-            controller: emailCtrl,
-            keyboardType: TextInputType.emailAddress,
-          ),
-          const SizedBox(height: 16),
-          AppTextField(
-            label: 'Password',
-            hint: 'At least 6 characters',
-            controller: passwordCtrl,
-            obscureText: true,
-          ),
-        ],
+      child: Form(
+        key: formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Create Account',
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Let\'s start by setting up your account',
+              style: TextStyle(fontSize: 15, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+            ),
+            const SizedBox(height: 32),
+            AppTextField(
+              label: 'Email',
+              hint: 'your@email.com',
+              controller: emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return 'Email is required';
+                if (!v.contains('@') || !v.contains('.')) return 'Enter a valid email';
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            AppTextField(
+              label: 'Password',
+              hint: 'At least 6 characters',
+              controller: passwordCtrl,
+              obscureText: true,
+              validator: (v) {
+                if (v == null || v.isEmpty) return 'Password is required';
+                if (v.length < 6) return 'Password must be at least 6 characters';
+                return null;
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

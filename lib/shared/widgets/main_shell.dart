@@ -10,7 +10,7 @@ class MainShell extends ConsumerWidget {
 
   static const _tabs = [
     _TabItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home', path: '/home'),
-    _TabItem(icon: Icons.account_balance_outlined, activeIcon: Icons.account_balance, label: 'Loans', path: '/loans'),
+    _TabItem(icon: Icons.calculate_outlined, activeIcon: Icons.calculate, label: 'Calculator', path: '/calculator'),
     _TabItem(icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard, label: 'Dashboard', path: '/dashboard'),
     _TabItem(icon: Icons.widgets_outlined, activeIcon: Icons.widgets, label: 'Tools', path: '/tools'),
   ];

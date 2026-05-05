@@ -89,32 +89,38 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     _ctrl.forward();
 
     // Auth resolved — mark and try navigate
-    // Check immediately in case auth is already resolved
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final current = ref.read(authStateProvider);
-      if (!current.isLoading) {
+      if (!current.isLoading && !_authResolved) {
         _authResolved = true;
         _tryNavigate();
       }
-      ref.listenManual(authStateProvider, (prev, next) {
-        if (!next.isLoading) {
-          _authResolved = true;
-          _tryNavigate();
-        }
-      });
+    });
+    
+    // Listen for auth changes
+    ref.listenManual(authStateProvider, (prev, next) {
+      if (!next.isLoading && !_authResolved) {
+        _authResolved = true;
+        _tryNavigate();
+      }
     });
   }
 
   /// Only navigates when BOTH animation is done AND auth is resolved.
   void _tryNavigate() {
-    if (!_animationDone || !_authResolved) return;
+    if (!_animationDone || !_authResolved || _navigated) return;
     _navigate();
   }
 
   void _navigate() {
     if (_navigated || !mounted) return;
     _navigated = true;
-    _checkFirstLaunch();
+    
+    // Small delay to ensure router is ready
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
+      _checkFirstLaunch();
+    });
   }
 
   Future<void> _checkFirstLaunch() async {
@@ -147,6 +153,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         return Scaffold(
           backgroundColor: AppColors.primary,
           body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Logo — scale bounce + fade in
+                ScaleTransition(
+                  scale: _logoScale,
+                  child: FadeTransition(
+                    opacity: _logoOpacity,
+                    child: Hero(
+                      tag: 'repayiq_logo',
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(26),
+                        child: Image.asset(
+                          'assets/images/logo_light.png',
+                          width: 116,
+                          height: 116,
+                          fit: BoxFit.cover,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -169,41 +192,41 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                ),
+                const SizedBox(height: 24),
 
-                  // App name — separate fade, slightly after logo
-                  FadeTransition(
-                    opacity: _nameOpacity,
+                // App name — separate fade, slightly after logo
+                FadeTransition(
+                  opacity: _nameOpacity,
+                  child: const Text(
+                    'RepayIQ',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Tagline — slides up last
+                SlideTransition(
+                  position: _taglineSlide,
+                  child: FadeTransition(
+                    opacity: _taglineOpacity,
                     child: const Text(
-                      'RepayIQ',
+                      'Repay smarter, live better.',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
+                        color: Colors.white60,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        letterSpacing: 0.3,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
-
-                  // Tagline — slides up last
-                  SlideTransition(
-                    position: _taglineSlide,
-                    child: FadeTransition(
-                      opacity: _taglineOpacity,
-                      child: const Text(
-                        'Repay smarter, live better.',
-                        style: TextStyle(
-                          color: Colors.white60,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );

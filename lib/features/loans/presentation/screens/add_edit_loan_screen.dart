@@ -25,6 +25,8 @@ class _AddEditLoanScreenState extends ConsumerState<AddEditLoanScreen> {
   final _rateCtrl = TextEditingController();
   final _tenureCtrl = TextEditingController();
   final _processingFeeCtrl = TextEditingController(text: '0');
+  final _bounceChargesCtrl = TextEditingController(text: '0');
+  final _lateChargesCtrl = TextEditingController(text: '0');
 
   String _loanType = AppConstants.loanTypes.first;
   String _method = AppConstants.reducingBalance;
@@ -74,6 +76,8 @@ class _AddEditLoanScreenState extends ConsumerState<AddEditLoanScreen> {
     _rateCtrl.dispose();
     _tenureCtrl.dispose();
     _processingFeeCtrl.dispose();
+    _bounceChargesCtrl.dispose();
+    _lateChargesCtrl.dispose();
     super.dispose();
   }
 
@@ -193,6 +197,9 @@ class _AddEditLoanScreenState extends ConsumerState<AddEditLoanScreen> {
         dueDay: _dueDay,
         reminderDays: _reminderDays,
         calculationMethod: _method,
+        processingFee: double.tryParse(_processingFeeCtrl.text) ?? 0.0,
+        bounceCharges: double.tryParse(_bounceChargesCtrl.text) ?? 0.0,
+        latePaymentCharges: double.tryParse(_lateChargesCtrl.text) ?? 0.0,
       );
       if (!mounted) return;
       _goBack();
@@ -356,6 +363,63 @@ class _AddEditLoanScreenState extends ConsumerState<AddEditLoanScreen> {
                 },
               ),
               const SizedBox(height: 16),
+
+              // ── Additional Charges Section (same as existing loan)
+              LoanFormLabel('Additional Charges (Optional)'),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                ),
+                child: const Row(children: [
+                  Icon(Icons.receipt_long_outlined, color: AppColors.primary, size: 16),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('These charges will be included in total cost calculations and AI advice.',
+                      style: TextStyle(fontSize: 11, color: AppColors.primary))),
+                ]),
+              ),
+              const SizedBox(height: 12),
+              if (!_showProcessingFee)
+                AppTextField(
+                  label: 'Processing Fee (₹)',
+                  hint: '0',
+                  controller: _processingFeeCtrl,
+                  keyboardType: TextInputType.number,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return null;
+                    if (double.tryParse(v) == null) return 'Invalid amount';
+                    return null;
+                  },
+                ),
+              if (!_showProcessingFee) const SizedBox(height: 12),
+              AppTextField(
+                label: 'Total Bounce Charges (₹)',
+                hint: '0',
+                controller: _bounceChargesCtrl,
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return null;
+                  if (double.tryParse(v) == null) return 'Invalid amount';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              AppTextField(
+                label: 'Total Late Payment Charges (₹)',
+                hint: '0',
+                controller: _lateChargesCtrl,
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return null;
+                  if (double.tryParse(v) == null) return 'Invalid amount';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
               LoanFormLabel('Calculation Method'),
               const SizedBox(height: 6),
               Row(
