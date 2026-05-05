@@ -41,8 +41,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       final l = loc(state);
       
       // Never redirect away from splash — it handles its own navigation
-      final isAuthRoute = l == '/login' || l == '/forgot-password' || l == '/welcome' || l == '/onboarding';
-      // Never redirect away from splash — it navigates itself
       if (l == '/') return null;
       
       // Let auth routes load without interference

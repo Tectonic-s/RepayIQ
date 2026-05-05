@@ -1,5 +1,4 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
 import '../../domain/entities/user_profile.dart';
 import '../../../loans/data/datasources/loan_local_datasource.dart';
 

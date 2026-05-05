@@ -180,14 +180,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                           child: const Text('Sign Up'),
                         ),
                       ],
-                const SizedBox(height: 32),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text("Don't have an account? "),
-                    TextButton(
-                      onPressed: () => context.go('/welcome'),
-                      child: const Text('Sign Up'),
                     ),
                   ],
                 ),
