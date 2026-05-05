@@ -170,24 +170,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                           width: 116,
                           height: 116,
                           fit: BoxFit.cover,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Logo — scale bounce + fade in
-                  ScaleTransition(
-                    scale: _logoScale,
-                    child: FadeTransition(
-                      opacity: _logoOpacity,
-                      child: Hero(
-                        tag: 'repayiq_logo',
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(26),
-                          child: Image.asset(
-                            'assets/images/logo_light.png',
-                            width: 116,
-                            height: 116,
-                            fit: BoxFit.cover,
-                          ),
                         ),
                       ),
                     ),
