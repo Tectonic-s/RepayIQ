@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/score_calculator.dart';
 import '../../../loans/presentation/providers/loan_providers.dart';
+import '../providers/score_providers.dart';
 
 class ScoreScreen extends ConsumerStatefulWidget {
   const ScoreScreen({super.key});
@@ -13,55 +14,29 @@ class ScoreScreen extends ConsumerStatefulWidget {
 }
 
 class _ScoreScreenState extends ConsumerState<ScoreScreen> {
-  final _incomeCtrl = TextEditingController();
-  double _monthlyIncome = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadIncome();
-  }
-
-  Future<void> _loadIncome() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getDouble('monthly_income') ?? 0;
-    setState(() {
-      _monthlyIncome = saved;
-      _incomeCtrl.text = saved == 0 ? '' : saved.toStringAsFixed(0);
-    });
-  }
-
-  Future<void> _saveIncome(String val) async {
-    final parsed = double.tryParse(val) ?? 0;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('monthly_income', parsed);
-    setState(() => _monthlyIncome = parsed);
-  }
-
-  @override
-  void dispose() {
-    _incomeCtrl.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final loans = ref.watch(loansStreamProvider).value ?? [];
-    final result = ScoreCalculator.calculate(loans: loans, monthlyIncome: _monthlyIncome);
+    final profile = ref.watch(userProfileProvider).value;
+    final monthlyIncome = profile?.monthlyIncome ?? 0.0;
+    final result = ScoreCalculator.calculate(loans: loans, monthlyIncome: monthlyIncome);
     final bandColor = _bandColor(result.band);
 
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          SliverToBoxAdapter(child: _ScoreHeader(score: result.score, band: result.band, color: bandColor)),
+          SliverToBoxAdapter(
+            child: _ScoreHeader(
+              score: result.score,
+              band: result.band,
+              color: bandColor,
+              monthlyIncome: monthlyIncome,
+            ),
+          ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                // Income input
-                _IncomeCard(ctrl: _incomeCtrl, onChanged: _saveIncome),
-                const SizedBox(height: 16),
-
                 // Factor breakdown
                 const Text('Score Breakdown', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 12),
@@ -104,11 +79,19 @@ class _ScoreHeader extends StatelessWidget {
   final int score;
   final String band;
   final Color color;
-  const _ScoreHeader({required this.score, required this.band, required this.color});
+  final double monthlyIncome;
+  
+  const _ScoreHeader({
+    required this.score,
+    required this.band,
+    required this.color,
+    required this.monthlyIncome,
+  });
 
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
+    
     return Container(
       padding: EdgeInsets.fromLTRB(20, topPadding + 12, 20, 28),
       decoration: BoxDecoration(
@@ -119,79 +102,160 @@ class _ScoreHeader extends StatelessWidget {
         ),
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
       ),
-      child: Column(children: [
-        const Text('RepayIQ Score', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
-        const SizedBox(height: 16),
-        TweenAnimationBuilder<int>(
-          tween: IntTween(begin: 0, end: score),
-          duration: const Duration(milliseconds: 1200),
-          curve: Curves.easeOut,
-          builder: (ctx, val, child) => Text(
-            '$val',
-            style: const TextStyle(color: Colors.white, fontSize: 72, fontWeight: FontWeight.w800, height: 1),
+      child: Column(
+        children: [
+          // Back button and title row
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => context.pop(),
+              ),
+              const Expanded(
+                child: Text(
+                  'RepayIQ Score',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 48), // Balance the back button
+            ],
           ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(20)),
-          child: Text(band, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
-        ),
-        const SizedBox(height: 16),
-        // Score bar
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: score / 100),
+          const SizedBox(height: 16),
+          // Score display
+          TweenAnimationBuilder<int>(
+            tween: IntTween(begin: 0, end: score),
             duration: const Duration(milliseconds: 1200),
             curve: Curves.easeOut,
-            builder: (ctx, v, child) => LinearProgressIndicator(
-              value: v, minHeight: 8,
-              backgroundColor: Colors.white24,
-              valueColor: const AlwaysStoppedAnimation(Colors.white),
+            builder: (ctx, val, child) => Text(
+              '$val',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 72,
+                fontWeight: FontWeight.w800,
+                height: 1,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 6),
-        const Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('0', style: TextStyle(color: Colors.white54, fontSize: 11)),
-          Text('100', style: TextStyle(color: Colors.white54, fontSize: 11)),
-        ]),
-      ]),
-    );
-  }
-}
-
-// ── Income input card ─────────────────────────────────────────────────────────
-
-class _IncomeCard extends StatelessWidget {
-  final TextEditingController ctrl;
-  final ValueChanged<String> onChanged;
-  const _IncomeCard({required this.ctrl, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Theme.of(context).cardTheme.color, borderRadius: BorderRadius.circular(16)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Monthly Income', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 4),
-        Text('Required to calculate debt-to-income ratio', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55))),
-        const SizedBox(height: 12),
-        TextField(
-          controller: ctrl,
-          keyboardType: TextInputType.number,
-          onChanged: onChanged,
-          decoration: InputDecoration(
-            prefixText: '₹ ',
-            hintText: 'Enter your monthly income',
-            filled: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              band,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
-        ),
-      ]),
+          const SizedBox(height: 16),
+          // Score bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: score / 100),
+              duration: const Duration(milliseconds: 1200),
+              curve: Curves.easeOut,
+              builder: (ctx, v, child) => LinearProgressIndicator(
+                value: v,
+                minHeight: 8,
+                backgroundColor: Colors.white24,
+                valueColor: const AlwaysStoppedAnimation(Colors.white),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('0', style: TextStyle(color: Colors.white54, fontSize: 11)),
+              Text('100', style: TextStyle(color: Colors.white54, fontSize: 11)),
+            ],
+          ),
+          // Monthly income info
+          if (monthlyIncome > 0) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.account_balance_wallet_outlined,
+                    color: Colors.white70,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Monthly Income: ₹${monthlyIncome.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: () => context.push('/settings/edit-profile'),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Add monthly income for accurate score',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.arrow_forward,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

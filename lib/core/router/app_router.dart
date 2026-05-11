@@ -16,7 +16,6 @@ import '../../features/loans/presentation/screens/amortisation_screen.dart';
 import '../../features/loans/presentation/screens/prepayment_screen.dart';
 import '../../features/emi_calculator/presentation/screens/emi_calculator_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
-import '../../features/reports/presentation/screens/reports_screen.dart';
 import '../../features/score/presentation/screens/score_screen.dart';
 import '../../features/budget/presentation/screens/budget_screen.dart';
 import '../../features/calendar/presentation/screens/calendar_screen.dart';
@@ -41,8 +40,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       final l = loc(state);
       
       // Never redirect away from splash — it handles its own navigation
-      final isAuthRoute = l == '/login' || l == '/forgot-password' || l == '/welcome' || l == '/onboarding';
-      // Never redirect away from splash — it navigates itself
       if (l == '/') return null;
       
       // Let auth routes load without interference
@@ -128,10 +125,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/loans',
         pageBuilder: (ctx, st) => _slideRightPage(st, const MyLoansScreen()),
-      ),
-      GoRoute(
-        path: '/reports',
-        pageBuilder: (ctx, st) => _slideUpPage(st, const ReportsScreen()),
       ),
       GoRoute(
         path: '/score',

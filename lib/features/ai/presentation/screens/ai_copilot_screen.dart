@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/ai_service.dart';
@@ -33,10 +34,65 @@ class _AiCopilotScreenState extends ConsumerState<AiCopilotScreen>
 
   @override
   Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
+      backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFFAFAFA),
       body: Column(
         children: [
-          _AiHeader(tabController: _tabController),
+          Container(
+            padding: EdgeInsets.fromLTRB(20, topPadding + 12, 20, 16),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkCard : Colors.white,
+              border: Border(bottom: BorderSide(color: Colors.black.withValues(alpha: 0.05))),
+            ),
+            child: Row(
+              children: [
+                GestureDetector(
+                  onTap: () => context.pop(),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.arrow_back, color: AppColors.primary, size: 20),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('AI Co-Pilot', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      Text('Powered by Gemini', style: TextStyle(fontSize: 11, color: AppColors.textHint)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkCard : Colors.white,
+              border: Border(bottom: BorderSide(color: Colors.black.withValues(alpha: 0.05))),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicatorColor: AppColors.primary,
+              indicatorWeight: 2,
+              labelColor: AppColors.primary,
+              unselectedLabelColor: AppColors.textHint,
+              labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              tabs: const [
+                Tab(text: 'Chat'),
+                Tab(text: 'Compare'),
+                Tab(text: 'Strategy'),
+              ],
+            ),
+          ),
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -46,67 +102,6 @@ class _AiCopilotScreenState extends ConsumerState<AiCopilotScreen>
                 _StrategistTab(),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Header ────────────────────────────────────────────────────────────────────
-
-class _AiHeader extends StatelessWidget {
-  final TabController tabController;
-  const _AiHeader({required this.tabController});
-
-  @override
-  Widget build(BuildContext context) {
-    final topPadding = MediaQuery.of(context).padding.top;
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, topPadding + 12, 20, 0),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF0D1B2A), Color(0xFF1B2838)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Container(
-              width: 36, height: 36,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.auto_awesome, color: AppColors.primary, size: 20),
-            ),
-            const SizedBox(width: 12),
-            const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('AI Co-Pilot', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
-              Text('Powered by Gemini', style: TextStyle(color: Colors.white38, fontSize: 11)),
-            ]),
-          ]),
-          const SizedBox(height: 16),
-          TabBar(
-            controller: tabController,
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            indicatorColor: AppColors.primary,
-            indicatorWeight: 2.5,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white38,
-            labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-            unselectedLabelStyle: const TextStyle(fontSize: 13),
-            dividerColor: Colors.transparent,
-            tabs: const [
-              Tab(text: '💬  Loan Coach'),
-              Tab(text: '⚖️  Compare Loans'),
-              Tab(text: '🎯  Strategist'),
-            ],
           ),
         ],
       ),
@@ -240,7 +235,7 @@ class _LoanCoachTabState extends ConsumerState<_LoanCoachTab> {
               ? _EmptyChat(suggestions: _suggestions, onTap: _send)
               : ListView.builder(
                   controller: _scrollCtrl,
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  padding: const EdgeInsets.all(16),
                   itemCount: _messages.length + (_loading ? 1 : 0),
                   itemBuilder: (ctx, i) {
                     if (i == _messages.length) return const _TypingIndicator();
@@ -264,32 +259,39 @@ class _EmptyChat extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        const SizedBox(height: 20),
-        const Icon(Icons.auto_awesome, size: 48, color: AppColors.primary),
-        const SizedBox(height: 12),
-        const Text('Ask me anything about your loans',
+        const SizedBox(height: 40),
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.auto_awesome, size: 28, color: AppColors.primary),
+        ),
+        const SizedBox(height: 16),
+        const Text('Ask me anything',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
         const SizedBox(height: 6),
-        Text('I have your full portfolio loaded as context.',
+        Text('I have your full loan portfolio loaded.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55))),
-        const SizedBox(height: 24),
+            style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5))),
+        const SizedBox(height: 32),
         ...suggestions.map((s) => GestureDetector(
           onTap: () => onTap(s),
           child: Container(
             margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: Theme.of(context).cardTheme.color,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
             ),
             child: Row(children: [
-              const Icon(Icons.lightbulb_outline, size: 16, color: AppColors.primary),
-              const SizedBox(width: 10),
+              const Icon(Icons.chat_bubble_outline, size: 16, color: AppColors.primary),
+              const SizedBox(width: 12),
               Expanded(child: Text(s, style: const TextStyle(fontSize: 13))),
-              Icon(Icons.arrow_forward_ios, size: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.38)),
             ]),
           ),
         )),
@@ -308,23 +310,25 @@ class _ChatBubble extends StatelessWidget {
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.82),
+        margin: const EdgeInsets.only(bottom: 10),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: isUser ? AppColors.primary : Theme.of(context).cardTheme.color,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(isUser ? 16 : 4),
-            bottomRight: Radius.circular(isUser ? 4 : 16),
-          ),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6, offset: const Offset(0, 2))],
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
         ),
         child: Text(
           isUser ? message.text : _cleanMarkdown(message.text),
           style: TextStyle(
-            fontSize: 14, height: 1.5,
+            fontSize: 14,
+            height: 1.4,
             color: isUser ? Colors.white : null,
           ),
         ),
@@ -401,7 +405,7 @@ class _ChatInput extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).padding.bottom + 90),
+      padding: EdgeInsets.fromLTRB(12, 8, 12, MediaQuery.of(context).viewInsets.bottom + 12),
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
         border: Border(top: BorderSide(color: Colors.black.withValues(alpha: 0.06))),
@@ -412,12 +416,14 @@ class _ChatInput extends StatelessWidget {
             controller: ctrl,
             textInputAction: TextInputAction.send,
             onSubmitted: onSend,
+            maxLines: null,
             decoration: InputDecoration(
               hintText: 'Ask about your loans...',
-              hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.38), fontSize: 14),
+              hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4), fontSize: 14),
               filled: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+              fillColor: Theme.of(context).cardTheme.color,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
             ),
           ),
         ),
@@ -425,14 +431,14 @@ class _ChatInput extends StatelessWidget {
         GestureDetector(
           onTap: loading ? null : () => onSend(ctrl.text),
           child: Container(
-            width: 44, height: 44,
+            width: 40, height: 40,
             decoration: BoxDecoration(
               color: loading ? AppColors.textHint : AppColors.primary,
               shape: BoxShape.circle,
             ),
             child: loading
-                ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                ? const Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.send_rounded, color: Colors.white, size: 18),
           ),
         ),
       ]),

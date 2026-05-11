@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/services/ocr_service.dart';
 import '../../../../core/services/statement_import_service.dart';
 import '../../../../shared/widgets/app_widgets.dart';
 import '../providers/loan_providers.dart';
@@ -69,6 +71,171 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
     super.dispose();
   }
 
+  Future<void> _scanWithCamera() async {
+    setState(() => _importing = true);
+    try {
+      final ocrText = await OcrService.scanDocument(source: ImageSource.camera);
+      if (ocrText == null || ocrText.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No text detected in image'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: AppColors.warning,
+            ),
+          );
+        }
+        return;
+      }
+      _fillFromOcrData(OcrService.parseOcrText(ocrText));
+    } on OcrException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _importing = false);
+    }
+  }
+
+  Future<void> _scanFromGallery() async {
+    setState(() => _importing = true);
+    try {
+      final ocrText = await OcrService.scanDocument(source: ImageSource.gallery);
+      if (ocrText == null || ocrText.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No text detected in image'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: AppColors.warning,
+            ),
+          );
+        }
+        return;
+      }
+      _fillFromOcrData(OcrService.parseOcrText(ocrText));
+    } on OcrException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _importing = false);
+    }
+  }
+
+  void _fillFromOcrData(Map<String, dynamic> data) {
+    setState(() {
+      if (data['lenderName'] != null) {
+        _nameCtrl.text = '${data['lenderName']} Loan';
+      }
+      if (data['principal'] != null) _principalCtrl.text = (data['principal'] as num).toStringAsFixed(0);
+      if (data['interestRate'] != null) _rateCtrl.text = (data['interestRate'] as num).toString();
+      if (data['tenureMonths'] != null) _tenureCtrl.text = (data['tenureMonths'] as num).toInt().toString();
+      if (data['processingFee'] != null) _processingFeeCtrl.text = (data['processingFee'] as num).toStringAsFixed(0);
+      if (data['bounceCharges'] != null) _bounceChargesCtrl.text = (data['bounceCharges'] as num).toStringAsFixed(0);
+      if (data['latePaymentCharges'] != null) _lateChargesCtrl.text = (data['latePaymentCharges'] as num).toStringAsFixed(0);
+      if (data['startDate'] != null) {
+        final parsed = DateTime.tryParse(data['startDate'] as String);
+        if (parsed != null) {
+          _startDate = parsed;
+          _autoFillEmisCompleted();
+        }
+      }
+    });
+    if (mounted) {
+      final filled = <String>[];
+      if (data['principal'] != null) filled.add('amount');
+      if (data['interestRate'] != null) filled.add('rate');
+      if (data['tenureMonths'] != null) filled.add('tenure');
+      if (data['startDate'] != null) filled.add('date');
+      if (data['processingFee'] != null) filled.add('processing fee');
+      final msg = filled.isEmpty
+          ? 'No details found — please fill in manually'
+          : 'Extracted: ${filled.join(', ')} — review before saving';
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text(msg),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: filled.isEmpty ? AppColors.warning : AppColors.success,
+        ));
+    }
+  }
+
+  Future<void> _showImportOptions() async {
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).padding.bottom + 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Import Loan Details',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 20),
+            _ImportOption(
+              icon: Icons.camera_alt_outlined,
+              title: 'Scan with Camera',
+              subtitle: 'Take a photo of your loan document',
+              onTap: () {
+                Navigator.pop(ctx);
+                _scanWithCamera();
+              },
+            ),
+            const SizedBox(height: 12),
+            _ImportOption(
+              icon: Icons.photo_library_outlined,
+              title: 'Choose from Gallery',
+              subtitle: 'Select an existing photo',
+              onTap: () {
+                Navigator.pop(ctx);
+                _scanFromGallery();
+              },
+            ),
+            const SizedBox(height: 12),
+            _ImportOption(
+              icon: Icons.upload_file_outlined,
+              title: 'Import PDF Statement',
+              subtitle: 'AI-powered extraction from PDF',
+              onTap: () {
+                Navigator.pop(ctx);
+                _importFromStatement();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _importFromStatement() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -86,44 +253,7 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
     try {
       final data = await StatementImportService.importFromPdf();
       if (data == null) return;
-      setState(() {
-        if (data['loanName'] != null || data['lenderName'] != null) {
-          _nameCtrl.text = '${data['lenderName'] ?? ''} ${data['loanName'] ?? ''}'.trim();
-        }
-        if (data['principal'] != null) _principalCtrl.text = (data['principal'] as num).toStringAsFixed(0);
-        if (data['interestRate'] != null) _rateCtrl.text = (data['interestRate'] as num).toString();
-        if (data['tenureMonths'] != null) _tenureCtrl.text = (data['tenureMonths'] as num).toInt().toString();
-        if (data['processingFee'] != null) _processingFeeCtrl.text = (data['processingFee'] as num).toStringAsFixed(0);
-        if (data['bounceCharges'] != null) _bounceChargesCtrl.text = (data['bounceCharges'] as num).toStringAsFixed(0);
-        if (data['latePaymentCharges'] != null) _lateChargesCtrl.text = (data['latePaymentCharges'] as num).toStringAsFixed(0);
-        if (data['startDate'] != null) {
-          final parsed = DateTime.tryParse(data['startDate'] as String);
-          if (parsed != null) {
-            _startDate = parsed;
-            _autoFillEmisCompleted();
-          }
-        }
-      });
-      if (mounted) {
-        final filled = <String>[];
-        if (data['principal'] != null) filled.add('amount');
-        if (data['interestRate'] != null) filled.add('rate');
-        if (data['tenureMonths'] != null) filled.add('tenure');
-        if (data['startDate'] != null) filled.add('date');
-        if (data['processingFee'] != null) filled.add('processing fee');
-        if (data['bounceCharges'] != null) filled.add('bounce charges');
-        if (data['latePaymentCharges'] != null) filled.add('late charges');
-        final msg = filled.isEmpty
-            ? 'No details found — please fill in manually'
-            : 'Extracted: ${filled.join(', ')} — review before saving';
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(
-            content: Text(msg),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: filled.isEmpty ? AppColors.warning : null,
-          ));
-      }
+      _fillFromOcrData(data);
     } on StatementImportException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -246,7 +376,7 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
 
               // ── Import from statement
               GestureDetector(
-                onTap: _importing ? null : _importFromStatement,
+                onTap: _importing ? null : _showImportOptions,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
@@ -267,9 +397,9 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
                     ),
                     const SizedBox(width: 12),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Text('Import from Statement',
+                      const Text('Scan or Import Document',
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primary)),
-                      Text('Scan a PDF or image to auto-fill',
+                      Text('Camera, Gallery, or PDF',
                           style: TextStyle(fontSize: 12, color: AppColors.primary.withValues(alpha: 0.7))),
                     ])),
                     Icon(Icons.arrow_forward_ios, size: 13, color: AppColors.primary.withValues(alpha: 0.5)),
@@ -545,6 +675,78 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
               const SizedBox(height: 24),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+
+class _ImportOption extends StatelessWidget {
+  final IconData icon;
+  final String title, subtitle;
+  final VoidCallback onTap;
+  
+  const _ImportOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: AppColors.primary, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+            ),
+          ],
         ),
       ),
     );

@@ -24,8 +24,6 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final loans = ref.watch(loansStreamProvider).value ?? [];
     final active = loans.where((l) => l.status == 'Active').toList();
 
-    final totalOutstanding = active.fold(0.0, (s, l) => s + l.outstandingBalance);
-    final totalEmi = active.fold(0.0, (s, l) => s + l.monthlyEmi);
     final totalInterest = active.fold(0.0, (s, l) =>
         s + (l.monthlyEmi * l.tenureMonths - l.principal).clamp(0, double.infinity));
     final totalPaid = active.fold(0.0, (s, l) => s + l.amountPaid);
@@ -70,18 +68,31 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
-                      _SummaryGrid(
-                        totalOutstanding: totalOutstanding,
-                        totalEmi: totalEmi,
-                        totalInterest: totalInterest,
-                        totalPaid: totalPaid,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _SummaryCard(
+                              label: 'Total Interest',
+                              value: Formatters.currency(totalInterest),
+                              color: AppColors.warning,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _SummaryCard(
+                              label: 'Amount Paid',
+                              value: Formatters.currency(totalPaid),
+                              color: AppColors.success,
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 24),
-                      const _SectionTitle('Monthly Interest Paid'),
+                      const _SectionTitle('Monthly Interest Trend'),
                       const SizedBox(height: 4),
                       Text(
                         'Interest component of your EMI over the next 12 months',
-                        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55)),
+                        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                       ),
                       const SizedBox(height: 12),
                       _MonthlyBarChart(
@@ -146,7 +157,7 @@ class _ReportsHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
     return Container(
-      padding: EdgeInsets.fromLTRB(20, topPadding + 12, 20, 24),
+      padding: EdgeInsets.fromLTRB(20, topPadding + 16, 20, 20),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFF4A148C), Color(0xFF6A1B9A)],
@@ -155,62 +166,80 @@ class _ReportsHeader extends StatelessWidget {
         ),
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text('Reports',
-                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700)),
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(10),
               ),
-              if (onExport != null)
-                GestureDetector(
-                  onTap: onExport,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.picture_as_pdf_outlined, color: Colors.white, size: 16),
-                        SizedBox(width: 6),
-                        Text('Export PDF', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  ),
+              child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text('Reports',
+                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700)),
+          ),
+          if (onExport != null)
+            GestureDetector(
+              onTap: onExport,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _HeaderStat(label: 'Total Interest Cost', value: Formatters.currency(totalInterest)),
-              const SizedBox(width: 24),
-              _HeaderStat(label: 'Amount Paid So Far', value: Formatters.currency(totalPaid)),
-            ],
-          ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.picture_as_pdf_outlined, color: Colors.white, size: 16),
+                    SizedBox(width: 6),
+                    Text('Export', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
-class _HeaderStat extends StatelessWidget {
+class _SummaryCard extends StatelessWidget {
   final String label, value;
-  const _HeaderStat({required this.label, required this.value});
+  final Color color;
+  const _SummaryCard({required this.label, required this.value, required this.color});
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(color: Colors.white60, fontSize: 11)),
-        const SizedBox(height: 2),
-        Text(value, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
-      ],
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.0 : 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5))),
+          const SizedBox(height: 8),
+          Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: color)),
+        ],
+      ),
     );
   }
 }
@@ -231,10 +260,17 @@ class _MonthlyBarChart extends StatelessWidget {
 
     return Container(
       height: 220,
-      padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.0 : 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: BarChart(
         BarChartData(
@@ -305,37 +341,7 @@ class _MonthlyBarChart extends StatelessWidget {
   }
 }
 
-// ── Summary grid ──────────────────────────────────────────────────────────────
-
-class _SummaryGrid extends StatelessWidget {
-  final double totalOutstanding, totalEmi, totalInterest, totalPaid;
-  const _SummaryGrid({
-    required this.totalOutstanding,
-    required this.totalEmi,
-    required this.totalInterest,
-    required this.totalPaid,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.7,
-      children: [
-        _StatCard(label: 'Total Outstanding', value: Formatters.currency(totalOutstanding), color: AppColors.error),
-        _StatCard(label: 'Monthly EMI', value: Formatters.currency(totalEmi), color: AppColors.primary),
-        _StatCard(label: 'Total Interest', value: Formatters.currency(totalInterest), color: AppColors.warning),
-        _StatCard(label: 'Amount Paid', value: Formatters.currency(totalPaid), color: AppColors.success),
-      ],
-    );
-  }
-}
-
-// ── Per-loan interest tile ────────────────────────────────────────────────────
+// ── Shared small widgets ──────────────────────────────────────────────────────
 
 class _LoanInterestTile extends StatelessWidget {
   final Loan loan;
@@ -347,13 +353,21 @@ class _LoanInterestTile extends StatelessWidget {
     final interestPaid = (loan.monthlyEmi * loan.monthsElapsed - (loan.principal - loan.outstandingBalance))
         .clamp(0.0, double.infinity);
     final color = AppColors.loanTypeColor(loan.loanType);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.0 : 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -408,46 +422,18 @@ class _MiniStat extends StatelessWidget {
   }
 }
 
-// ── Shared small widgets ──────────────────────────────────────────────────────
+// ── Data model ───────────────────────────────────────────────────────────────
+
+class _MonthPoint {
+  final String label;
+  final double interest;
+  const _MonthPoint({required this.label, required this.interest});
+}
 
 class _SectionTitle extends StatelessWidget {
   final String text;
   const _SectionTitle(this.text);
   @override
   Widget build(BuildContext context) =>
-      Text(text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600));
-}
-
-class _StatCard extends StatelessWidget {
-  final String label, value;
-  final Color color;
-  const _StatCard({required this.label, required this.value, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardTheme.color,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55))),
-          const SizedBox(height: 6),
-          Text(value,
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: color)),
-        ],
-      ),
-    );
-  }
-}
-
-class _MonthPoint {
-  final String label;
-  final double interest;
-  const _MonthPoint({required this.label, required this.interest});
+      Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: -0.3));
 }
