@@ -13,6 +13,7 @@ import '../../../loans/domain/entities/loan.dart';
 import '../../../loans/presentation/providers/loan_providers.dart';
 import '../../../payments/domain/entities/loan_payment.dart';
 import '../../../payments/presentation/providers/payment_providers.dart';
+import '../../../score/presentation/providers/score_providers.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -64,6 +65,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final photoBase64 = ref.watch(profilePhotoProvider).value;
     final paidKeysByLoan = ref.watch(allPaidKeysByLoanProvider);
     final overdue = active.where((l) => l.isOverdueWithPayments(paidKeysByLoan[l.id] ?? {})).toList();
+    final repayIQScore = ref.watch(repayIQScoreProvider);
     final top = MediaQuery.of(context).padding.top;
 
     return Scaffold(
@@ -84,6 +86,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: _HeroBalance(
               totalOutstanding: totalOutstanding,
               totalEmi: totalEmi,
+              repayIQScore: repayIQScore,
             ),
           ),
 
@@ -215,16 +218,122 @@ class _IconBtn extends StatelessWidget {
 
 class _HeroBalance extends StatelessWidget {
   final double totalOutstanding, totalEmi;
-  const _HeroBalance({required this.totalOutstanding, required this.totalEmi});
+  final dynamic repayIQScore;
+  
+  const _HeroBalance({
+    required this.totalOutstanding,
+    required this.totalEmi,
+    required this.repayIQScore,
+  });
+
+  Color _getBandColor(String band) {
+    switch (band) {
+      case 'Excellent': return const Color(0xFF10B981);
+      case 'Good': return const Color(0xFF3B82F6);
+      case 'Fair': return const Color(0xFFF59E0B);
+      case 'Poor': return const Color(0xFFEF4444);
+      default: return AppColors.textHint;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final score = repayIQScore.score as int;
+    final band = repayIQScore.band as String;
+    final bandColor = _getBandColor(band);
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 32, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          GestureDetector(
+            onTap: () => context.push('/score'),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    bandColor.withValues(alpha: 0.15),
+                    bandColor.withValues(alpha: 0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: bandColor.withValues(alpha: 0.3), width: 1.5),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: bandColor, width: 4),
+                      color: bandColor.withValues(alpha: 0.1),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$score',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          color: bandColor,
+                          letterSpacing: -1,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'RepayIQ Score',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                            color: isDark ? Colors.white60 : AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          band,
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            color: bandColor,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Text(
+                              'View Dashboard',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: bandColor.withValues(alpha: 0.7),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(Icons.arrow_forward, size: 12, color: bandColor.withValues(alpha: 0.7)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
           Text(
             'TOTAL OUTSTANDING',
             style: TextStyle(

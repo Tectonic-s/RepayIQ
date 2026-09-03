@@ -8,6 +8,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/profile_photo_provider.dart';
 import '../../../../shared/widgets/app_widgets.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../onboarding/domain/entities/user_profile.dart';
+import '../../../onboarding/data/datasources/user_profile_local_datasource.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -19,18 +21,39 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameCtrl;
+  late final TextEditingController _incomeCtrl;
+  late final TextEditingController _expensesCtrl;
   bool _isLoading = false;
+  UserProfile? _profile;
 
   @override
   void initState() {
     super.initState();
     final user = ref.read(authStateProvider).value;
     _nameCtrl = TextEditingController(text: user?.displayName ?? '');
+    _incomeCtrl = TextEditingController();
+    _expensesCtrl = TextEditingController();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final uid = ref.read(authStateProvider).value?.uid;
+    if (uid == null) return;
+    final profile = await UserProfileLocalDataSource().getUserProfile(uid);
+    if (mounted && profile != null) {
+      setState(() {
+        _profile = profile;
+        _incomeCtrl.text = profile.monthlyIncome.toStringAsFixed(0);
+        _expensesCtrl.text = profile.monthlyExpenses.toStringAsFixed(0);
+      });
+    }
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _incomeCtrl.dispose();
+    _expensesCtrl.dispose();
     super.dispose();
   }
 
@@ -72,8 +95,29 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     try {
+      // Update Firebase display name
       await FirebaseAuth.instance.currentUser?.updateDisplayName(_nameCtrl.text.trim());
       await FirebaseAuth.instance.currentUser?.reload();
+      
+      // Update user profile (income/expenses)
+      final uid = ref.read(authStateProvider).value?.uid;
+      if (uid != null) {
+        final updatedProfile = (_profile ?? UserProfile(
+          userId: uid,
+          monthlyIncome: 0,
+          monthlyExpenses: 0,
+          enableReminders: true,
+          enableAiNudges: true,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        )).copyWith(
+          monthlyIncome: double.tryParse(_incomeCtrl.text) ?? 0,
+          monthlyExpenses: double.tryParse(_expensesCtrl.text) ?? 0,
+          updatedAt: DateTime.now(),
+        );
+        await UserProfileLocalDataSource().upsertUserProfile(updatedProfile);
+      }
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated')));
         context.pop();
@@ -174,7 +218,67 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     hint: '',
                     controller: TextEditingController(text: user?.email ?? ''),
                     prefixIcon: Icons.email_outlined,
-                    validator: null,
+                    enabled: false,
+                  ),
+                  const SizedBox(height: 24),
+                  // Budget Section
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Monthly Budget',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  AppTextField(
+                    label: 'Monthly Income (₹)',
+                    hint: '50000',
+                    controller: _incomeCtrl,
+                    prefixIcon: Icons.account_balance_wallet_outlined,
+                    keyboardType: TextInputType.number,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return null;
+                      if (double.tryParse(v) == null) return 'Enter valid amount';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  AppTextField(
+                    label: 'Monthly Expenses (₹)',
+                    hint: '30000',
+                    controller: _expensesCtrl,
+                    prefixIcon: Icons.shopping_cart_outlined,
+                    keyboardType: TextInputType.number,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return null;
+                      if (double.tryParse(v) == null) return 'Enter valid amount';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, color: AppColors.primary, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Used for debt-to-income ratio and budget analysis',
+                            style: TextStyle(fontSize: 11, color: AppColors.primary),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 32),
                   PrimaryButton(label: 'Save Changes', onPressed: _save, isLoading: _isLoading),

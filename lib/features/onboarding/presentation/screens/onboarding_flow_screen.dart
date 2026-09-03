@@ -528,6 +528,10 @@ class _PreferenceToggle extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
+<<<<<<< HEAD
+=======
+            activeThumbColor: AppColors.primary,
+>>>>>>> feat/UI
           ),
         ],
       ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/report_generator.dart';
 import '../../../loans/domain/entities/loan.dart';
 import '../../../loans/presentation/providers/loan_providers.dart';
 
@@ -23,7 +24,6 @@ class DashboardScreen extends ConsumerWidget {
       byType[loan.loanType] = (byType[loan.loanType] ?? 0) + loan.outstandingBalance;
     }
     final top = MediaQuery.of(context).padding.top;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       body: active.isEmpty
@@ -31,38 +31,21 @@ class DashboardScreen extends ConsumerWidget {
           : CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(20, top + 16, 20, 0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Dashboard',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.5,
-                              color: isDark ? Colors.white : AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                  child: _DashboardHeader(
+                    topPadding: top,
+                    onExport: () => ReportGenerator.exportLoanSummaryPdf(loans),
                   ),
                 ),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
-
-                      // ── Summary row ─────────────────────────────────────
                       _SummaryRow(
                         totalOutstanding: totalOutstanding,
                         totalEmi: totalEmi,
                       ),
                       const SizedBox(height: 24),
 
-                      // ── Principal vs Interest ────────────────────────────
                       _SectionHeader('Principal vs Interest'),
                       const SizedBox(height: 12),
                       _PrincipalInterestChart(
@@ -71,13 +54,11 @@ class DashboardScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 24),
 
-                      // ── Debt by Category ─────────────────────────────────
                       _SectionHeader('Debt by Category'),
                       const SizedBox(height: 12),
                       _CategoryChart(byType: byType, total: totalOutstanding),
                       const SizedBox(height: 24),
 
-                      // ── Loan Breakdown ───────────────────────────────────
                       _SectionHeader('Loan Breakdown'),
                       const SizedBox(height: 12),
                       ...active.map((l) => _LoanBreakdownTile(
@@ -441,6 +422,65 @@ class _LoanBreakdownTile extends StatelessWidget {
               style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.45))),
         ]),
       ]),
+    );
+  }
+}
+
+// ── Dashboard Header ──────────────────────────────────────────────────────────
+
+class _DashboardHeader extends StatelessWidget {
+  final double topPadding;
+  final VoidCallback onExport;
+  
+  const _DashboardHeader({
+    required this.topPadding,
+    required this.onExport,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, topPadding + 16, 20, 24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppColors.primary.withValues(alpha: 0.9), AppColors.primary],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+      ),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'Dashboard',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: onExport,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.share_outlined, color: Colors.white, size: 16),
+                  SizedBox(width: 6),
+                  Text('Export', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

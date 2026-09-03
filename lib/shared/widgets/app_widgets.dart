@@ -161,6 +161,7 @@ class AppTextField extends StatefulWidget {
   final TextInputAction textInputAction;
   final void Function(String)? onFieldSubmitted;
   final bool autofocus;
+  final bool enabled;
 
   const AppTextField({
     super.key,
@@ -175,6 +176,7 @@ class AppTextField extends StatefulWidget {
     this.textInputAction = TextInputAction.next,
     this.onFieldSubmitted,
     this.autofocus = false,
+    this.enabled = true,
   });
 
   @override
@@ -206,6 +208,7 @@ class _AppTextFieldState extends State<AppTextField> {
         ),
         const SizedBox(height: 6),
         TextFormField(
+          enabled: widget.enabled,
           controller: widget.controller,
           obscureText: _obscure,
           keyboardType: widget.keyboardType,

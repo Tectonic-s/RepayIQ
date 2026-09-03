@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'ocr_service.dart';
@@ -38,7 +39,7 @@ class StatementImportService {
       final tmpFile = File('${dir.path}/ocr_import.$ext');
       await tmpFile.writeAsBytes(bytes);
       try {
-        text = await OcrService.extractText(tmpFile);
+        text = await OcrService.scanDocument(source: ImageSource.gallery).then((t) => t ?? '');
       } on OcrException catch (e) {
         throw StatementImportException(e.message);
       } finally {

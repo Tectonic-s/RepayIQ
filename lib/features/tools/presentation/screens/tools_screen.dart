@@ -6,12 +6,9 @@ class ToolsScreen extends StatelessWidget {
   const ToolsScreen({super.key});
 
   static const _tools = [
-    _ToolItem('EMI Calculator', 'Calculate loan EMIs', Icons.calculate_outlined, AppColors.primary, '/calculator'),
-    _ToolItem('RepayIQ Score', 'Your financial health score', Icons.star_outline, AppColors.scoreGood, '/score'),
     _ToolItem('Budget Analyser', 'Income vs EMI impact', Icons.account_balance_wallet_outlined, AppColors.success, '/budget'),
     _ToolItem('EMI Calendar', 'All due dates at a glance', Icons.calendar_month_outlined, AppColors.accent, '/calendar'),
     _ToolItem('Family Manager', 'Track family-wide debt', Icons.group_outlined, AppColors.vehicle, '/family'),
-    _ToolItem('Reports', 'Charts & PDF export', Icons.bar_chart_outlined, AppColors.warning, '/reports'),
     _ToolItem('AI Co-Pilot', 'Gemini-powered advisor', Icons.auto_awesome_outlined, AppColors.personal, '/ai'),
   ];
 
