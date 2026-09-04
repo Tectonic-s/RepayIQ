@@ -8,6 +8,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/profile_photo_provider.dart';
 import '../../../../core/services/overdue_detector.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/score_calculator.dart';
 import '../../../../shared/widgets/app_widgets.dart';
 import '../../../loans/domain/entities/loan.dart';
 import '../../../loans/presentation/providers/loan_providers.dart';
@@ -218,7 +219,7 @@ class _IconBtn extends StatelessWidget {
 
 class _HeroBalance extends StatelessWidget {
   final double totalOutstanding, totalEmi;
-  final dynamic repayIQScore;
+  final RepayIQScore repayIQScore;
   
   const _HeroBalance({
     required this.totalOutstanding,
@@ -239,8 +240,8 @@ class _HeroBalance extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final score = repayIQScore.score as int;
-    final band = repayIQScore.band as String;
+    final score = repayIQScore.score;
+    final band = repayIQScore.band;
     final bandColor = _getBandColor(band);
 
     return Padding(
