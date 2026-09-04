@@ -211,27 +211,28 @@ class _DueDayPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8, runSpacing: 8,
-      children: [1, 5, 7, 10, 15, 20, 25, 28].map((d) {
-        final sel = value == d;
-        return GestureDetector(
-          onTap: () => onChanged(d),
-          child: Container(
-            width: 44, height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: sel ? AppColors.primary : Theme.of(context).cardTheme.color,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: sel ? AppColors.primary : const Color(0xFFE5E7EB)),
-            ),
-            child: Text('$d', style: TextStyle(
-              fontSize: 13, fontWeight: FontWeight.w600,
-              color: sel ? Colors.white : Theme.of(context).colorScheme.onSurface,
-            )),
-          ),
-        );
-      }).toList(),
+    return GestureDetector(
+      onTap: () async {
+        final picked = await showDueDaySheet(context, value);
+        if (picked != null) onChanged(picked);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(12),
+          border: const Border.fromBorderSide(BorderSide(color: Color(0xFFE5E7EB))),
+        ),
+        child: Row(children: [
+          Icon(Icons.event_outlined, size: 18,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.38)),
+          const SizedBox(width: 10),
+          Text('Every month on the ${ordinal(value)}',
+              style: const TextStyle(fontSize: 15)),
+          const Spacer(),
+          Icon(Icons.chevron_right, size: 18, color: AppColors.primary),
+        ]),
+      ),
     );
   }
 }
