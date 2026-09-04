@@ -13,7 +13,7 @@ class AppConstants {
   static const List<String> loanTypes = [
     'Home Loan',
     'Vehicle Loan',
-    'Consumer Durable',
+    'No-Cost EMI',
     'Personal Loan',
     'Education Loan',
     'Business Loan',

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/providers/notifications_provider.dart';
 import '../../../../core/providers/profile_photo_provider.dart';
 import '../../../../core/providers/theme_provider.dart';
 import '../../../../core/utils/demo_data_seeder.dart';
@@ -110,10 +111,13 @@ class SettingsScreen extends ConsumerWidget {
                   _SettingsTile(
                     icon: Icons.notifications_outlined,
                     label: 'Notifications',
-                    onTap: () {},
+                    onTap: () => ref.read(notificationsProvider.notifier).setEnabled(
+                          !ref.read(notificationsProvider),
+                        ),
                     trailing: Switch(
-                      value: true,
-                      onChanged: (_) {},
+                      value: ref.watch(notificationsProvider),
+                      onChanged: (v) =>
+                          ref.read(notificationsProvider.notifier).setEnabled(v),
                       activeThumbColor: AppColors.primary,
                     ),
                   ),

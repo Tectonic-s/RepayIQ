@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../shared/widgets/app_widgets.dart';
 import '../providers/loan_providers.dart';
 import '../widgets/loan_card.dart';
 
@@ -28,14 +29,31 @@ class MyLoansScreen extends ConsumerWidget {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(20, top + 16, 20, 0),
-                  child: Text(
-                    'My Loans',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                      color: isDark ? Colors.white : AppColors.textPrimary,
-                    ),
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => context.go('/home'),
+                        child: Container(
+                          width: 36, height: 36,
+                          decoration: BoxDecoration(
+                            color: cs.onSurface.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(Icons.arrow_back, size: 18,
+                              color: cs.onSurface.withValues(alpha: 0.7)),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Text(
+                        'My Loans',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -103,9 +121,14 @@ class MyLoansScreen extends ConsumerWidget {
         actions: [
           TextButton(onPressed: () => context.pop(), child: const Text('Cancel')),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               context.pop();
               ref.read(loanNotifierProvider.notifier).deleteLoan(id);
+              await showLoanSavedOverlay(
+                context,
+                message: 'Loan deleted',
+                iconColor: AppColors.error,
+              );
             },
             child: const Text('Delete', style: TextStyle(color: AppColors.error)),
           ),

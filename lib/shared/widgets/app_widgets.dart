@@ -1,6 +1,113 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 
+/// Shows a full-screen success overlay: progress bar fills → tick appears → auto-dismisses.
+/// Awaiting this future means the caller can navigate after it completes.
+Future<void> showLoanSavedOverlay(BuildContext context, {String message = 'Loan added successfully', Color? iconColor}) async {
+  await showGeneralDialog(
+    context: context,
+    barrierDismissible: false,
+    barrierColor: Colors.black54,
+    transitionDuration: const Duration(milliseconds: 250),
+    transitionBuilder: (context, anim, secondary, child) =>
+        FadeTransition(opacity: anim, child: child),
+    pageBuilder: (ctx, a, b) => _LoanSavedOverlay(message: message, iconColor: iconColor),
+  );
+}
+
+class _LoanSavedOverlay extends StatefulWidget {
+  final String message;
+  final Color? iconColor;
+  const _LoanSavedOverlay({required this.message, this.iconColor});
+  @override
+  State<_LoanSavedOverlay> createState() => _LoanSavedOverlayState();
+}
+
+class _LoanSavedOverlayState extends State<_LoanSavedOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _progress;
+  late final Animation<double> _tickScale;
+  bool _showTick = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
+    _progress = CurvedAnimation(parent: _ctrl, curve: const Interval(0.0, 0.7, curve: Curves.easeInOut));
+    _tickScale = CurvedAnimation(parent: _ctrl, curve: const Interval(0.65, 1.0, curve: Curves.elasticOut));
+    _ctrl.forward().then((_) {
+      if (mounted) setState(() => _showTick = true);
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) Navigator.of(context).pop();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 220,
+        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 30, offset: const Offset(0, 8))],
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          AnimatedBuilder(
+            animation: _ctrl,
+            builder: (context, child) => Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 72, height: 72,
+                  child: CircularProgressIndicator(
+                    value: _progress.value,
+                    strokeWidth: 5,
+                    backgroundColor: (widget.iconColor ?? AppColors.primary).withValues(alpha: 0.12),
+                    valueColor: AlwaysStoppedAnimation(widget.iconColor ?? AppColors.primary),
+                    strokeCap: StrokeCap.round,
+                  ),
+                ),
+                if (_showTick)
+                  ScaleTransition(
+                    scale: _tickScale,
+                    child: Container(
+                      width: 44, height: 44,
+                      decoration: BoxDecoration(
+                        color: widget.iconColor ?? AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.check_rounded, color: Colors.white, size: 26),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            widget.message,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
 /// Wraps any widget with a fade+slide-up transition when its content changes.
 /// Use by giving a unique [key] that changes when data changes.
 class AnimatedDataSwitch extends StatelessWidget {

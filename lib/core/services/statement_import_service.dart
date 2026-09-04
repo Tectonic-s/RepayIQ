@@ -125,10 +125,23 @@ class StatementImportService {
     for (final pattern in patterns) {
       final match = RegExp(pattern, caseSensitive: false, multiLine: true).firstMatch(text);
       if (match != null) {
-        // Remove Indian-format commas e.g. 10,40,000.00 → 1040000.00
         final raw = match.group(1)?.replaceAll(',', '') ?? '';
         final value = double.tryParse(raw);
         if (value != null && value > 1000) return value;
+      }
+    }
+    return null;
+  }
+
+  /// Like [_extractAmount] but without a minimum threshold — used for fees/charges
+  /// which can legitimately be ₹0–₹999.
+  static double? _extractFee(String text, List<String> patterns) {
+    for (final pattern in patterns) {
+      final match = RegExp(pattern, caseSensitive: false, multiLine: true).firstMatch(text);
+      if (match != null) {
+        final raw = match.group(1)?.replaceAll(',', '') ?? '';
+        final value = double.tryParse(raw);
+        if (value != null && value >= 0) return value;
       }
     }
     return null;
@@ -206,28 +219,33 @@ class StatementImportService {
 
   static double? _extractProcessingFee(String text) {
     final patterns = [
-      r'PROCESSING\s*FEE\s*Deducted\s*From\s*Loan\s*Amount\s*([\d,]+\.?\d*)',
+      r'PROCESSING\s*FEE\s*Deducted\s*From\s*Loan\s*Amount\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
       r'processing\s*(?:fee|charge)s?\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
+      r'proc\.?\s*(?:fee|charge)s?\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
+      r'(?:upfront|one.?time)\s*(?:fee|charge)s?\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
+      r'loan\s*processing\s*(?:fee|charge)s?\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
     ];
-    return _extractAmount(text, patterns);
+    return _extractFee(text, patterns);
   }
 
   static double? _extractBounceCharges(String text) {
     final patterns = [
-      r'Bounce\s*Charges?\s*\([^)]*\)\s*([\d,]+\.?\d*)',
+      r'Bounce\s*Charges?\s*\([^)]*\)\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
       r'bounce\s*charges?\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
+      r'dishonour\s*charges?\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
       r'Total.*?bounce.*?([\d,]+\.?\d*)',
     ];
-    return _extractAmount(text, patterns);
+    return _extractFee(text, patterns);
   }
 
   static double? _extractLateCharges(String text) {
     final patterns = [
-      r'Late\s*Payment\s*Charges?\s*\([^)]*\)\s*([\d,]+\.?\d*)',
+      r'Late\s*Payment\s*Charges?\s*\([^)]*\)\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
       r'late\s*(?:payment)?\s*charges?\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
       r'penal\s*(?:interest|charges?)\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
+      r'overdue\s*charges?\s*[:\(₹Rs.\s]*([\d,]+\.?\d*)',
     ];
-    return _extractAmount(text, patterns);
+    return _extractFee(text, patterns);
   }
 
   static String? _extractLoanType(String text) {

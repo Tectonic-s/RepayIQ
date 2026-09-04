@@ -25,7 +25,7 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
   final _principalCtrl = TextEditingController();
   final _rateCtrl = TextEditingController();
   final _tenureCtrl = TextEditingController();
-  final _emisCompletedCtrl = TextEditingController();
+  final _emisCompletedCtrl = TextEditingController(text: '0');
   final _processingFeeCtrl = TextEditingController(text: '0');
   final _bounceChargesCtrl = TextEditingController(text: '0');
   final _lateChargesCtrl = TextEditingController(text: '0');
@@ -37,16 +37,16 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
   int _reminderDays = 3;
   bool _importing = false;
 
-  bool get _isConsumerDurable => _loanType == 'Consumer Durable';
+  bool get _isNoCostEmi => _loanType == 'No-Cost EMI';
   bool get _isZeroRate => double.tryParse(_rateCtrl.text) == 0;
-  bool get _showProcessingFee => _isConsumerDurable && _isZeroRate;
 
   @override
   void initState() {
     super.initState();
     _rateCtrl.addListener(() => setState(() {}));
-    // Auto-compute EMIs completed when start date or tenure changes
     _tenureCtrl.addListener(_autoFillEmisCompleted);
+    // Pre-fill on first frame using default start date
+    WidgetsBinding.instance.addPostFrameCallback((_) => _autoFillEmisCompleted());
   }
 
   void _autoFillEmisCompleted() {
@@ -285,56 +285,63 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    final notifier = ref.read(loanNotifierProvider.notifier);
+    try {
+      final notifier = ref.read(loanNotifierProvider.notifier);
 
-    await notifier.addLoan(
-      loanName: _nameCtrl.text.trim(),
-      loanType: _loanType,
-      principal: double.parse(_principalCtrl.text),
-      interestRate: double.parse(_rateCtrl.text),
-      tenureMonths: int.parse(_tenureCtrl.text),
-      startDate: _startDate,
-      dueDay: _dueDay,
-      reminderDays: _reminderDays,
-      calculationMethod: _method,
-      processingFee: double.tryParse(_processingFeeCtrl.text) ?? 0.0,
-      bounceCharges: double.tryParse(_bounceChargesCtrl.text) ?? 0.0,
-      latePaymentCharges: double.tryParse(_lateChargesCtrl.text) ?? 0.0,
-    );
-
-    if (!mounted) return;
-
-    // Get the newly added loan
-    final loans = ref.read(loansStreamProvider).value ?? [];
-    final loan = loans.isNotEmpty
-        ? (List.from(loans)..sort((a, b) => b.createdAt.compareTo(a.createdAt))).first
-        : null;
-
-    if (loan == null) { context.go('/loans'); return; }
-
-    final emisCompleted = int.tryParse(_emisCompletedCtrl.text) ?? 0;
-
-    // Auto-mark current month as paid if today is past the due day
-    // (user is adding an existing loan mid-month after already paying)
-    final now = DateTime.now();
-    final currentMonthDue = DateTime(now.year, now.month, _dueDay);
-    final currentMonthAlreadyPaid = now.isAfter(currentMonthDue);
-    final currentMonthKey = LoanPayment.keyFromDate(now);
-
-    if (currentMonthAlreadyPaid) {
-      await ref.read(paymentNotifierProvider.notifier).togglePayment(
-        loanId: loan.id,
-        monthKey: currentMonthKey,
-        emiAmount: loan.monthlyEmi,
-        existingPayments: const [],
+      final loan = await notifier.addLoan(
+        loanName: _nameCtrl.text.trim(),
+        loanType: _loanType,
+        principal: double.parse(_principalCtrl.text),
+        interestRate: double.parse(_rateCtrl.text),
+        tenureMonths: int.parse(_tenureCtrl.text),
+        startDate: _startDate,
+        dueDay: _dueDay,
+        reminderDays: _reminderDays,
+        calculationMethod: _method,
+        processingFee: double.tryParse(_processingFeeCtrl.text) ?? 0.0,
+        bounceCharges: double.tryParse(_bounceChargesCtrl.text) ?? 0.0,
+        latePaymentCharges: double.tryParse(_lateChargesCtrl.text) ?? 0.0,
       );
-    }
 
-    if (!mounted) return;
-    if (emisCompleted > 0) {
-      context.push('/past-payments', extra: loan);
-    } else {
-      context.go('/loans');
+      if (!mounted) return;
+
+      final emisCompleted = int.tryParse(_emisCompletedCtrl.text) ?? 0;
+
+      final now = DateTime.now();
+      final currentMonthDue = DateTime(now.year, now.month, _dueDay);
+      final currentMonthAlreadyPaid = now.isAfter(currentMonthDue);
+      final currentMonthKey = LoanPayment.keyFromDate(now);
+
+      if (currentMonthAlreadyPaid) {
+        try {
+          await ref.read(paymentNotifierProvider.notifier).togglePayment(
+            loanId: loan.id,
+            monthKey: currentMonthKey,
+            emiAmount: loan.monthlyEmi,
+            existingPayments: const [],
+          );
+        } catch (_) {
+          // Non-critical — don't block navigation
+        }
+      }
+
+      if (!mounted) return;
+      if (emisCompleted > 0) {
+        context.push('/past-payments', extra: loan);
+      } else {
+        await showLoanSavedOverlay(context);
+        if (!mounted) return;
+        context.go('/home');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text('Failed to save loan: $e'),
+          backgroundColor: const Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ));
     }
   }
 
@@ -354,7 +361,7 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
               Row(
                 children: [
                   GestureDetector(
-                    onTap: () => context.pop(),
+                    onTap: () => context.go('/home'),
                     child: Container(
                       width: 36, height: 36,
                       decoration: BoxDecoration(
@@ -436,7 +443,12 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
               const SizedBox(height: 8),
               LoanTypeSelector(
                 selected: _loanType,
-                onChanged: (t) => setState(() => _loanType = t),
+                onChanged: (t) {
+                  setState(() {
+                    _loanType = t;
+                    if (t == 'No-Cost EMI') _rateCtrl.text = '0';
+                  });
+                },
               ),
               const SizedBox(height: 16),
               AppTextField(
@@ -454,7 +466,7 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
               const SizedBox(height: 16),
               AppTextField(
                 label: 'Annual Interest Rate (%)',
-                hint: _isConsumerDurable ? '0 for No-Cost EMI' : '8.5',
+                hint: _isNoCostEmi ? '0 for No-Cost EMI' : '8.5',
                 controller: _rateCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 validator: (v) {
@@ -465,7 +477,7 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
                   return null;
                 },
               ),
-              if (_showProcessingFee) ...[
+              if (_isNoCostEmi && _isZeroRate) ...[
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -477,21 +489,9 @@ class _AddExistingLoanScreenState extends ConsumerState<AddExistingLoanScreen> {
                   child: const Row(children: [
                     Icon(Icons.info_outline, color: AppColors.warning, size: 16),
                     SizedBox(width: 8),
-                    Expanded(child: Text('No-Cost EMI detected. Enter processing fee to calculate true cost.',
+                    Expanded(child: Text('No-Cost EMI detected. Enter processing fee below to calculate true cost.',
                         style: TextStyle(fontSize: 12, color: AppColors.warning))),
                   ]),
-                ),
-                const SizedBox(height: 10),
-                AppTextField(
-                  label: 'Processing Fee (₹)',
-                  hint: '2999',
-                  controller: _processingFeeCtrl,
-                  keyboardType: TextInputType.number,
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Enter processing fee (0 if none)';
-                    if (double.tryParse(v) == null) return 'Invalid amount';
-                    return null;
-                  },
                 ),
               ],
               const SizedBox(height: 16),

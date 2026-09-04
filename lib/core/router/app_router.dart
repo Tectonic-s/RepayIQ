@@ -118,13 +118,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/dashboard', builder: (ctx, st) => const DashboardScreen()),
           GoRoute(path: '/tools', builder: (ctx, st) => const ToolsScreen()),
           GoRoute(path: '/settings', builder: (ctx, st) => const SettingsScreen()),
+          GoRoute(path: '/loans', builder: (ctx, st) => const MyLoansScreen()),
         ],
-      ),
-
-      // Full-screen routes
-      GoRoute(
-        path: '/loans',
-        pageBuilder: (ctx, st) => _slideRightPage(st, const MyLoansScreen()),
       ),
       GoRoute(
         path: '/score',
