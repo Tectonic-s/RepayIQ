@@ -59,8 +59,8 @@ class UserProfile {
         monthlyIncome: (map['monthlyIncome'] as num).toDouble(),
         monthlyExpenses: (map['monthlyExpenses'] as num).toDouble(),
         debtFreeGoalDate: map['debtFreeGoalDate'] as String?,
-        enableReminders: map['enableReminders'] as bool,
-        enableAiNudges: map['enableAiNudges'] as bool,
+        enableReminders: map['enableReminders'] == true || map['enableReminders'] == 1,
+        enableAiNudges: map['enableAiNudges'] == true || map['enableAiNudges'] == 1,
         createdAt: DateTime.parse(map['createdAt'] as String),
         updatedAt: DateTime.parse(map['updatedAt'] as String),
       );
