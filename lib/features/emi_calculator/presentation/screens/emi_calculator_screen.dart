@@ -14,7 +14,7 @@ import '../../../../shared/widgets/app_widgets.dart';
 enum LoanType {
   home('Home Loan', Icons.home_outlined, AppColors.home),
   vehicle('Vehicle Loan', Icons.directions_car_outlined, AppColors.vehicle),
-  consumerDurable('Consumer Durable', Icons.devices_outlined, AppColors.appliance),
+  noCostEmi('No-Cost EMI', Icons.devices_outlined, AppColors.appliance),
   personal('Personal Loan', Icons.person_outline, AppColors.personal),
   education('Education Loan', Icons.school_outlined, AppColors.primary),
   business('Business Loan', Icons.business_outlined, AppColors.creditCard);
@@ -23,6 +23,8 @@ enum LoanType {
   final IconData icon;
   final Color color;
   const LoanType(this.label, this.icon, this.color);
+
+  bool get requiresProcessingFee => this == LoanType.noCostEmi;
 }
 
 class EmiCalculatorScreen extends ConsumerStatefulWidget {
@@ -38,10 +40,19 @@ class _EmiCalculatorScreenState extends ConsumerState<EmiCalculatorScreen> {
   final _rateCtrl = TextEditingController();
   final _tenureCtrl = TextEditingController();
   final _moratoriumCtrl = TextEditingController(text: '0');
-  final _processingFeeCtrl = TextEditingController(text: '0');
+  final _processingFeeAmtCtrl = TextEditingController();
+  final _processingFeePctCtrl = TextEditingController();
+  bool _syncingFee = false;
 
   LoanType _loanType = LoanType.home;
   _CalcResult? _result;
+
+  @override
+  void initState() {
+    super.initState();
+    _processingFeeAmtCtrl.addListener(() => _onFeeAmountChanged(_processingFeeAmtCtrl.text));
+    _processingFeePctCtrl.addListener(() => _onFeePctChanged(_processingFeePctCtrl.text));
+  }
 
   @override
   void dispose() {
@@ -49,8 +60,31 @@ class _EmiCalculatorScreenState extends ConsumerState<EmiCalculatorScreen> {
     _rateCtrl.dispose();
     _tenureCtrl.dispose();
     _moratoriumCtrl.dispose();
-    _processingFeeCtrl.dispose();
+    _processingFeeAmtCtrl.dispose();
+    _processingFeePctCtrl.dispose();
     super.dispose();
+  }
+
+  void _onFeeAmountChanged(String val) {
+    if (_syncingFee) return;
+    final principal = double.tryParse(_principalCtrl.text);
+    final amt = double.tryParse(val);
+    if (principal != null && principal > 0 && amt != null) {
+      _syncingFee = true;
+      _processingFeePctCtrl.text = (amt / principal * 100).toStringAsFixed(2);
+      _syncingFee = false;
+    }
+  }
+
+  void _onFeePctChanged(String val) {
+    if (_syncingFee) return;
+    final principal = double.tryParse(_principalCtrl.text);
+    final pct = double.tryParse(val);
+    if (principal != null && principal > 0 && pct != null) {
+      _syncingFee = true;
+      _processingFeeAmtCtrl.text = (principal * pct / 100).toStringAsFixed(2);
+      _syncingFee = false;
+    }
   }
 
   void _calculate() {
@@ -60,6 +94,8 @@ class _EmiCalculatorScreenState extends ConsumerState<EmiCalculatorScreen> {
     final principal = double.parse(_principalCtrl.text);
     final rate = double.parse(_rateCtrl.text);
     final tenure = int.parse(_tenureCtrl.text);
+
+    final processingFee = double.tryParse(_processingFeeAmtCtrl.text) ?? 0;
 
     double emi;
     double totalInterest;
@@ -77,8 +113,7 @@ class _EmiCalculatorScreenState extends ConsumerState<EmiCalculatorScreen> {
       emi = res['emi']!;
       totalInterest = res['totalInterest']!;
       moratoriumInterest = res['moratoriumInterest'];
-    } else if (_loanType == LoanType.consumerDurable) {
-      final processingFee = double.tryParse(_processingFeeCtrl.text) ?? 0;
+    } else if (_loanType == LoanType.noCostEmi) {
       emi = EmiCalculator.reducingBalanceEmi(principal: principal, annualRate: rate, tenureMonths: tenure);
       totalInterest = EmiCalculator.totalInterest(emi: emi, tenureMonths: tenure, principal: principal);
       if (processingFee > 0) {
@@ -97,7 +132,8 @@ class _EmiCalculatorScreenState extends ConsumerState<EmiCalculatorScreen> {
         tenure: tenure,
         emi: emi,
         totalInterest: totalInterest,
-        totalRepayment: emi * tenure,
+        totalRepayment: emi * tenure + processingFee,
+        processingFee: processingFee,
         moratoriumInterest: moratoriumInterest,
         effectiveRate: effectiveRate,
       );
@@ -185,7 +221,7 @@ class _EmiCalculatorScreenState extends ConsumerState<EmiCalculatorScreen> {
                   label: 'Tenure (months)', hint: '240',
                   controller: _tenureCtrl, keyboardType: TextInputType.number,
                   prefixIcon: Icons.calendar_month_outlined,
-                  textInputAction: _loanType == LoanType.education || _loanType == LoanType.consumerDurable
+                  textInputAction: _loanType == LoanType.education
                       ? TextInputAction.next
                       : TextInputAction.done,
                   onFieldSubmitted: (_) => _calculate(),
@@ -213,20 +249,58 @@ class _EmiCalculatorScreenState extends ConsumerState<EmiCalculatorScreen> {
                   ),
                 ],
 
-                // Consumer Durable — processing fee field
-                if (_loanType == LoanType.consumerDurable) ...[
+                // Processing fee — compulsory for No-Cost EMI, optional for all others
+                if (_loanType == LoanType.noCostEmi || _loanType != LoanType.education) ...[
                   const SizedBox(height: 16),
-                  AppTextField(
-                    label: 'Processing Fee (₹) — for No-Cost EMI', hint: '0',
-                    controller: _processingFeeCtrl, keyboardType: TextInputType.number,
-                    prefixIcon: Icons.receipt_outlined,
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _calculate(),
-                    validator: (v) {
-                      if (v!.isEmpty) return 'Required';
-                      if (double.tryParse(v) == null) return 'Invalid';
-                      return null;
-                    },
+                  Text(
+                    _loanType == LoanType.noCostEmi
+                        ? 'Processing Fee (required)'
+                        : 'Processing Fee (optional)',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: AppTextField(
+                          label: 'Amount (₹)',
+                          hint: '999',
+                          controller: _processingFeeAmtCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          prefixIcon: Icons.currency_rupee,
+                          onFieldSubmitted: (_) => _calculate(),
+                          validator: _loanType == LoanType.noCostEmi
+                              ? (v) {
+                                  if (v == null || v.isEmpty) return 'Required';
+                                  if (double.tryParse(v) == null) return 'Invalid';
+                                  return null;
+                                }
+                              : (v) {
+                                  if (v != null && v.isNotEmpty && double.tryParse(v) == null) return 'Invalid';
+                                  return null;
+                                },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: AppTextField(
+                          label: 'Percentage (%)',
+                          hint: '1.5',
+                          controller: _processingFeePctCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          prefixIcon: Icons.percent,
+                          onFieldSubmitted: (_) => _calculate(),
+                          validator: (v) {
+                            if (v != null && v.isNotEmpty && double.tryParse(v) == null) return 'Invalid';
+                            return null;
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ],
 
@@ -499,6 +573,8 @@ class _ResultSectionState extends State<_ResultSection> {
             const SizedBox(height: 12),
             _Row('Principal', Formatters.currency(r.principal)),
             _Row('Total Interest', Formatters.currency(r.totalInterest)),
+            if (r.processingFee > 0)
+              _Row('Processing Fee', Formatters.currency(r.processingFee)),
             _Row('Total Repayment', Formatters.currency(r.totalRepayment)),
             _Row('Tenure', Formatters.tenure(r.tenure)),
 
@@ -760,6 +836,7 @@ class _CalcResult {
   final int tenure;
   final double? moratoriumInterest;
   final double? effectiveRate;
+  final double processingFee;
 
   const _CalcResult({
     required this.loanType,
@@ -769,6 +846,7 @@ class _CalcResult {
     required this.emi,
     required this.totalInterest,
     required this.totalRepayment,
+    required this.processingFee,
     this.moratoriumInterest,
     this.effectiveRate,
   });
