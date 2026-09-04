@@ -88,14 +88,18 @@ class OcrService {
 
     // Processing fee patterns
     final feePatterns = [
-      RegExp(r'(?:processing fee|processing charges)[:\s]*₹?\s*([0-9,]+(?:\.[0-9]{2})?)', caseSensitive: false),
+      RegExp(r'(?:processing fee|processing charges?|proc\.?\s*fee|loan processing fee|upfront fee|one.?time fee)[:\s]*₹?\s*([0-9,]+(?:\.[0-9]{2})?)', caseSensitive: false),
+      RegExp(r'₹\s*([0-9,]+(?:\.[0-9]{2})?)\s*(?:processing fee|proc fee)', caseSensitive: false),
     ];
     for (final pattern in feePatterns) {
       final match = pattern.firstMatch(text);
       if (match != null) {
         final amount = match.group(1)?.replaceAll(',', '');
-        data['processingFee'] = double.tryParse(amount ?? '');
-        break;
+        final value = double.tryParse(amount ?? '');
+        if (value != null && value >= 0) {
+          data['processingFee'] = value;
+          break;
+        }
       }
     }
 

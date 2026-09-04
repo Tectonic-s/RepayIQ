@@ -36,9 +36,9 @@ class _AddEditLoanScreenState extends ConsumerState<AddEditLoanScreen> {
   bool _importing = false;
 
   bool get _isEdit => widget.loan != null;
-  bool get _isConsumerDurable => _loanType == 'Consumer Durable';
+  bool get _isNoCostEmi => _loanType == 'No-Cost EMI';
   bool get _isZeroRate => double.tryParse(_rateCtrl.text) == 0;
-  bool get _showProcessingFee => _isConsumerDurable && _isZeroRate;
+  bool get _showProcessingFee => _isNoCostEmi && _isZeroRate;
 
   @override
   void initState() {
@@ -147,13 +147,7 @@ class _AddEditLoanScreenState extends ConsumerState<AddEditLoanScreen> {
     }
   }
 
-  void _goBack() {
-    if (context.canPop()) {
-      context.pop();
-    } else {
-      context.go('/loans');
-    }
-  }
+  void _goBack() => context.go('/home');
 
   Future<void> _pickDueDay() async {
     final picked = await showDueDaySheet(context, _dueDay);
@@ -174,35 +168,50 @@ class _AddEditLoanScreenState extends ConsumerState<AddEditLoanScreen> {
     if (!_formKey.currentState!.validate()) return;
     final notifier = ref.read(loanNotifierProvider.notifier);
     if (_isEdit) {
-      notifier.updateLoan(widget.loan!.copyWith(
-        loanName: _nameCtrl.text.trim(),
-        loanType: _loanType,
-        principal: double.parse(_principalCtrl.text),
-        interestRate: double.parse(_rateCtrl.text),
-        tenureMonths: int.parse(_tenureCtrl.text),
-        startDate: _startDate,
-        dueDay: _dueDay,
-        reminderDays: _reminderDays,
-        calculationMethod: _method,
-      ));
+      try {
+        notifier.updateLoan(widget.loan!.copyWith(
+          loanName: _nameCtrl.text.trim(),
+          loanType: _loanType,
+          principal: double.parse(_principalCtrl.text),
+          interestRate: double.parse(_rateCtrl.text),
+          tenureMonths: int.parse(_tenureCtrl.text),
+          startDate: _startDate,
+          dueDay: _dueDay,
+          reminderDays: _reminderDays,
+          calculationMethod: _method,
+        ));
+      } catch (_) {}
       _goBack();
     } else {
-      await notifier.addLoan(
-        loanName: _nameCtrl.text.trim(),
-        loanType: _loanType,
-        principal: double.parse(_principalCtrl.text),
-        interestRate: double.parse(_rateCtrl.text),
-        tenureMonths: int.parse(_tenureCtrl.text),
-        startDate: _startDate,
-        dueDay: _dueDay,
-        reminderDays: _reminderDays,
-        calculationMethod: _method,
-        processingFee: double.tryParse(_processingFeeCtrl.text) ?? 0.0,
-        bounceCharges: double.tryParse(_bounceChargesCtrl.text) ?? 0.0,
-        latePaymentCharges: double.tryParse(_lateChargesCtrl.text) ?? 0.0,
-      );
-      if (!mounted) return;
-      _goBack();
+      try {
+        await notifier.addLoan(
+          loanName: _nameCtrl.text.trim(),
+          loanType: _loanType,
+          principal: double.parse(_principalCtrl.text),
+          interestRate: double.parse(_rateCtrl.text),
+          tenureMonths: int.parse(_tenureCtrl.text),
+          startDate: _startDate,
+          dueDay: _dueDay,
+          reminderDays: _reminderDays,
+          calculationMethod: _method,
+          processingFee: double.tryParse(_processingFeeCtrl.text) ?? 0.0,
+          bounceCharges: double.tryParse(_bounceChargesCtrl.text) ?? 0.0,
+          latePaymentCharges: double.tryParse(_lateChargesCtrl.text) ?? 0.0,
+        );
+        if (!mounted) return;
+        await showLoanSavedOverlay(context);
+        if (!mounted) return;
+        context.go('/home');
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+            content: Text('Failed to save loan: $e'),
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+          ));
+      }
     }
   }
 
@@ -308,7 +317,7 @@ class _AddEditLoanScreenState extends ConsumerState<AddEditLoanScreen> {
               const SizedBox(height: 16),
               AppTextField(
                 label: 'Annual Interest Rate (%)',
-                hint: _isConsumerDurable ? '0 for No-Cost EMI' : '8.5',
+                hint: _isNoCostEmi ? '0 for No-Cost EMI' : '8.5',
                 controller: _rateCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 validator: (v) {

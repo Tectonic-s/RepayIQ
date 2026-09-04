@@ -18,7 +18,7 @@ class LoanTypeChooserScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             GestureDetector(
-              onTap: () => context.go('/loans'),
+              onTap: () => context.go('/home'),
               child: Container(
                 width: 36, height: 36,
                 decoration: BoxDecoration(

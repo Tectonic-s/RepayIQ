@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 
@@ -47,6 +48,12 @@ class NotificationService {
     }
   }
 
+  /// Returns false if the user has disabled notifications in settings.
+  static Future<bool> _isEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('notifications_enabled') ?? true;
+  }
+
   /// Schedules reminder X days before due + payment check ON the due day
   static Future<void> scheduleLoanReminder({
     required String loanId,
@@ -54,6 +61,8 @@ class NotificationService {
     required int dueDay,
     required int reminderDays,
   }) async {
+    if (!await _isEnabled()) return;
+
     final now = tz.TZDateTime.now(tz.local);
 
     // 1. Reminder X days before due
@@ -113,7 +122,7 @@ class NotificationService {
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
-      payload: '/payment-confirm/$loanId', // deep link route
+      payload: '/payment-confirm/$loanId',
     );
   }
 
@@ -121,6 +130,8 @@ class NotificationService {
     required String loanId,
     required String loanName,
   }) async {
+    if (!await _isEnabled()) return;
+
     final id = (loanId.hashCode.abs() % 100000) + 1;
     await _plugin.show(
       id,
@@ -146,14 +157,14 @@ class NotificationService {
   }
 
   /// Weekly AI nudge — every Sunday 10am, surfaces highest-interest loan.
-  /// Call this whenever loans change (add/delete).
   static Future<void> scheduleWeeklyAiNudge({
     required String loanType,
     required double estimatedSavings,
   }) async {
-    await _plugin.cancel(999001); // cancel previous
+    if (!await _isEnabled()) return;
+
+    await _plugin.cancel(999001);
     final now = tz.TZDateTime.now(tz.local);
-    // Next Sunday at 10:00
     final daysUntilSunday = (7 - now.weekday) % 7 == 0 ? 7 : (7 - now.weekday) % 7;
     final nextSunday = tz.TZDateTime(
       tz.local, now.year, now.month, now.day + daysUntilSunday, 10, 0,
@@ -184,8 +195,10 @@ class NotificationService {
   static Future<void> scheduleWeeklyDigest({
     required double totalEmiPaid,
     required double totalOutstanding,
-    required int scoreDelta, // positive = improved, negative = dropped
+    required int scoreDelta,
   }) async {
+    if (!await _isEnabled()) return;
+
     await _plugin.cancel(999002);
     final now = tz.TZDateTime.now(tz.local);
     final daysUntilSunday = (7 - now.weekday) % 7 == 0 ? 7 : (7 - now.weekday) % 7;

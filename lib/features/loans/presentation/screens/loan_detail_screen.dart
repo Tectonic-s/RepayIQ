@@ -19,7 +19,10 @@ class LoanDetailScreen extends ConsumerWidget {
     final loan = loans.where((l) => l.id == loanId).firstOrNull;
 
     if (loan == null) {
-      return Scaffold(appBar: AppBar(), body: const Center(child: CircularProgressIndicator()));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/home');
+      });
+      return const Scaffold(body: SizedBox.shrink());
     }
 
     final color = AppColors.loanTypeColor(loan.loanType);
@@ -49,6 +52,8 @@ class LoanDetailScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             _CloseButton(loan: loan),
           ],
+          const SizedBox(height: 12),
+          _DeleteButton(loan: loan),
           const SizedBox(height: 80),
         ],
       ),
@@ -436,6 +441,61 @@ class _CloseButton extends ConsumerWidget {
               context.pop();
             },
             child: const Text('Close Loan', style: TextStyle(color: AppColors.success)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Delete button ─────────────────────────────────────────────────────────────
+
+class _DeleteButton extends ConsumerWidget {
+  final Loan loan;
+  const _DeleteButton({required this.loan});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return GestureDetector(
+      onTap: () => _confirm(context, ref),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.error.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
+        ),
+        child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(Icons.delete_outline, color: AppColors.error, size: 20),
+          SizedBox(width: 8),
+          Text('Delete Loan',
+              style: TextStyle(fontSize: 14, color: AppColors.error, fontWeight: FontWeight.w600)),
+        ]),
+      ),
+    );
+  }
+
+  void _confirm(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Loan'),
+        content: const Text('This will permanently delete the loan and all its payment history. This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              ref.read(loanNotifierProvider.notifier).deleteLoan(loan.id);
+              await showLoanSavedOverlay(
+                context,
+                message: 'Loan deleted',
+                iconColor: AppColors.error,
+              );
+              if (context.mounted) context.go('/loans');
+            },
+            child: const Text('Delete', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),

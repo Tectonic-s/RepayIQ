@@ -45,7 +45,7 @@ class AppColors {
       case 'Home Loan':        return home;
       case 'Vehicle Loan':     return vehicle;
       case 'Personal Loan':    return personal;
-      case 'Consumer Durable': return appliance;
+      case 'No-Cost EMI': return appliance;
       case 'Education Loan':   return primary;
       case 'Business Loan':    return creditCard;
       default:                 return primary;
@@ -57,7 +57,7 @@ class AppColors {
       case 'Home Loan':        return Icons.home_outlined;
       case 'Vehicle Loan':     return Icons.directions_car_outlined;
       case 'Personal Loan':    return Icons.person_outline;
-      case 'Consumer Durable': return Icons.devices_outlined;
+      case 'No-Cost EMI': return Icons.devices_outlined;
       case 'Education Loan':   return Icons.school_outlined;
       case 'Business Loan':    return Icons.business_outlined;
       default:                 return Icons.account_balance_outlined;

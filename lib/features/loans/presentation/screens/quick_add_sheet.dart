@@ -69,7 +69,7 @@ class _QuickAddSheetState extends ConsumerState<_QuickAddSheet> {
     final tenure = int.tryParse(_tenureCtrl.text) ?? template?.defaultTenure ?? 36;
     final name = _nameCtrl.text.trim().isEmpty ? _loanType : _nameCtrl.text.trim();
 
-    await ref.read(loanNotifierProvider.notifier).addLoan(
+    final saved = await ref.read(loanNotifierProvider.notifier).addLoan(
       loanName: name,
       loanType: _loanType,
       principal: principal,
@@ -82,10 +82,8 @@ class _QuickAddSheetState extends ConsumerState<_QuickAddSheet> {
     );
 
     if (!mounted) return;
-    final loans = ref.read(loansStreamProvider).value ?? [];
-    final saved = loans.isNotEmpty
-        ? (List.from(loans)..sort((a, b) => b.createdAt.compareTo(a.createdAt))).first
-        : null;
+    await showLoanSavedOverlay(context);
+    if (!mounted) return;
     Navigator.pop(context, saved);
   }
 

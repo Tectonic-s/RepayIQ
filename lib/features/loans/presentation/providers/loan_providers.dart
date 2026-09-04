@@ -58,7 +58,7 @@ class LoanNotifier extends StateNotifier<AsyncValue<void>> {
   final LoanRepository _repo;
   LoanNotifier(this._repo) : super(const AsyncValue.data(null));
 
-  Future<void> addLoan({
+  Future<Loan> addLoan({
     required String loanName,
     required String loanType,
     required double principal,
@@ -98,36 +98,62 @@ class LoanNotifier extends StateNotifier<AsyncValue<void>> {
       latePaymentCharges: latePaymentCharges,
     );
     state = await AsyncValue.guard(() => _repo.addLoan(loan));
+    await _scheduleLoanNotification(loan);
     await _scheduleNudgeIfNeeded();
+    return loan;
   }
 
   Future<void> _scheduleNudgeIfNeeded() async {
-    final loans = await _repo.watchLoans().first;
-    final active = loans.where((l) => l.status == AppConstants.statusActive).toList();
-    if (active.length < 2) return;
-    final highest = active.reduce((a, b) => a.interestRate > b.interestRate ? a : b);
-    final savings = highest.monthlyEmi * highest.monthsRemaining - highest.outstandingBalance;
-    await NotificationService.scheduleWeeklyAiNudge(
-      loanType: highest.loanType,
-      estimatedSavings: savings.clamp(0, double.infinity),
-    );
+    try {
+      final loans = await _repo.getLoans();
+      final active = loans.where((l) => l.status == AppConstants.statusActive).toList();
+      if (active.length < 2) return;
+      final highest = active.reduce((a, b) => a.interestRate > b.interestRate ? a : b);
+      final savings = highest.monthlyEmi * highest.monthsRemaining - highest.outstandingBalance;
+      await NotificationService.scheduleWeeklyAiNudge(
+        loanType: highest.loanType,
+        estimatedSavings: savings.clamp(0, double.infinity),
+      );
+    } catch (_) {
+      // Non-critical — never block loan save
+    }
   }
 
   Future<void> updateLoan(Loan loan) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => _repo.updateLoan(loan));
+    // Re-schedule with updated dueDay / reminderDays
+    await NotificationService.cancelLoanNotifications(loan.id);
+    if (loan.status == AppConstants.statusActive) {
+      await _scheduleLoanNotification(loan);
+    }
   }
 
   Future<void> deleteLoan(String id) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _repo.deleteLoan(id));
+    await NotificationService.cancelLoanNotifications(id);
+    await AsyncValue.guard(() => _repo.deleteLoan(id));
+    state = const AsyncValue.data(null);
   }
 
   Future<void> closeLoan(Loan loan) async {
     state = const AsyncValue.loading();
+    await NotificationService.cancelLoanNotifications(loan.id);
     state = await AsyncValue.guard(
       () => _repo.updateLoan(loan.copyWith(status: AppConstants.statusClosed)),
     );
+  }
+
+  Future<void> _scheduleLoanNotification(Loan loan) async {
+    try {
+      await NotificationService.scheduleLoanReminder(
+        loanId: loan.id,
+        loanName: loan.loanName,
+        dueDay: loan.dueDay,
+        reminderDays: loan.reminderDays,
+      );
+    } catch (_) {
+      // Non-critical — never block loan save
+    }
   }
 
   void reset() => state = const AsyncValue.data(null);
